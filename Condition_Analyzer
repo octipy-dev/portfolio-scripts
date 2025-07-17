@@ -1,47 +1,109 @@
+# --------------------------------------------------------------------------------
+# Home Exterior Decay & Repair Analyzer
+#
+# This script models the exponential decay of different home exterior sections
+# (roof, walls, windows, doors) over time, calculates their current condition,
+# flags which areas need repair based on a threshold, and visualizes the results
+# as a color‐coded bar chart.
+# --------------------------------------------------------------------------------
+
 import polars as pl
 import numpy as np
 import matplotlib.pyplot as plt
 
 
-# Define decay function
+# --------------------------------------------------------------------------------
+# Exponential Decay Function
+# --------------------------------------------------------------------------------
 def decay_function(initial_value, decay_rate, time):
+    """
+    Compute the decayed condition after a given time using:
+        current_value = initial_value * exp(-decay_rate * time)
+
+    Parameters:
+      initial_value (float): Starting condition score.
+      decay_rate    (float): Annual decay constant.
+      time          (float): Age in years.
+
+    Returns:
+      float: Condition score at the given time.
+    """
     return initial_value * np.exp(-decay_rate * time)
 
 
-# Sample data for home exterior sections
+# --------------------------------------------------------------------------------
+# Sample Data Setup
+# --------------------------------------------------------------------------------
 data = {
     'section': ['Roof', 'Walls', 'Windows', 'Doors'],
-    'initial_condition': [100, 100, 100, 100],  # Initial condition score
-    'decay_rate': [0.05, 0.03, 0.04, 0.02],     # Decay rate per year
-    'age': [10, 15, 8, 12]                      # Age in years
+    'initial_condition': [100, 100, 100, 100],  # Starting score for each section
+    'decay_rate': [0.05, 0.03, 0.04, 0.02],     # Annual decay rate per section
+    'age': [10, 15, 8, 12]                      # Current age in years
 }
 
-# Create a Polars DataFrame
+# Create a Polars DataFrame from the sample data
 df = pl.DataFrame(data)
 
-# Calculate current condition
+
+# --------------------------------------------------------------------------------
+# Compute Current Condition
+# --------------------------------------------------------------------------------
+# Vectorized calculation: initial_condition * exp(-decay_rate * age)
 df = df.with_columns(
-    (pl.col('initial_condition') * np.exp(-pl.col('decay_rate') * pl.col('age'))).alias('current_condition')
+    (pl.col('initial_condition') * np.exp(-pl.col('decay_rate') * pl.col('age')))
+    .alias('current_condition')
 )
 
-# Identify sections needing repair (condition below a threshold)
-repair_threshold = 50
+
+# --------------------------------------------------------------------------------
+# Flag Sections Needing Repair
+# --------------------------------------------------------------------------------
+repair_threshold = 50  # Below this value, a section is considered in need of repair
 df = df.with_columns(
-    (pl.col('current_condition') < repair_threshold).alias('needs_repair')
+    (pl.col('current_condition') < repair_threshold)
+    .alias('needs_repair')
 )
 
-# Convert to pandas for plotting
+
+# --------------------------------------------------------------------------------
+# Convert to Pandas for Plotting
+# --------------------------------------------------------------------------------
+# (Matplotlib interfaces seamlessly with pandas DataFrames)
 df_pandas = df.to_pandas()
 
-# Plot the results
+
+# --------------------------------------------------------------------------------
+# Visualization
+# --------------------------------------------------------------------------------
 plt.figure(figsize=(10, 6))
-plt.bar(df_pandas['section'], df_pandas['current_condition'], color=df_pandas['needs_repair'].map(
-    {True: 'red', False: 'green'}))
-plt.axhline(y=repair_threshold, color='blue', linestyle='--', label='Repair Threshold')
+
+# Bar colors: red if needs_repair == True, green otherwise
+colors = df_pandas['needs_repair'].map({True: 'red', False: 'green'})
+
+plt.bar(
+    df_pandas['section'],
+    df_pandas['current_condition'],
+    color=colors
+)
+
+# Draw horizontal line marking the repair threshold
+plt.axhline(
+    y=repair_threshold,
+    color='blue',
+    linestyle='--',
+    label='Repair Threshold'
+)
+
+# Labeling
 plt.xlabel('Home Exterior Section')
 plt.ylabel('Current Condition')
 plt.title('Home Exterior Condition and Repair Needs')
 plt.legend()
+plt.tight_layout()
 plt.show()
 
+
+# --------------------------------------------------------------------------------
+# Output the DataFrame for Reference
+# --------------------------------------------------------------------------------
 print(df)
