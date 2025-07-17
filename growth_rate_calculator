@@ -1,0 +1,56 @@
+#!/usr/bin/env python3
+# -----------------------------------------------------------------------------
+# Script: growth_rate_calculator.py
+# Description:
+#   Computes the constant growth (or decay) rate per period required to move
+#   from an initial value to a final value over a specified number of periods.
+#
+# Workflow:
+#   1. Prompt the user for:
+#        - initial value (float > 0)
+#        - final value (float > 0)
+#        - number of periods (int > 0)
+#   2. Validate inputs to ensure all values are positive and periods is an integer.
+#   3. Calculate the periodic growth rate using the formula:
+#        growth_rate = (final/initial)^(1/periods) - 1
+#   4. Display the result as a percentage with two decimal places.
+#
+# Usage:
+#   python growth_rate_calculator.py
+#   Enter the initial value: 100
+#   Enter the final value: 200
+#   Enter the number of periods: 5
+#   Growth rate per period: 14.87%
+#
+# Benefits:
+#   - Quickly determines required CAGR (Compound Annual Growth Rate) or similar metrics
+#   - Input validation prevents divide-by-zero and negative period errors
+# -----------------------------------------------------------------------------
+
+
+def main():
+    """Main entry point: prompt for inputs, validate, calculate, and display."""
+    try:
+        initial_value = float(input("Enter the initial value: ").strip())
+        final_value   = float(input("Enter the final value: ").strip())
+        periods       = int(input("Enter the number of periods: ").strip())
+    except ValueError:
+        print("Error: Please enter numeric values for initial/final values and an integer for periods.")
+        return
+
+    if initial_value <= 0 or final_value <= 0:
+        print("Error: Initial and final values must be greater than zero.")
+        return
+    if periods <= 0:
+        print("Error: Number of periods must be a positive integer.")
+        return
+
+    # Calculate periodic growth rate using the formula:
+    #   growth_rate = (final_value / initial_value)^(1/periods) - 1
+    growth_rate = (final_value / initial_value) ** (1.0 / periods) - 1.0
+
+    # Display the result as a percentage
+    print(f"Growth rate per period: {growth_rate * 100:.2f}%")
+
+if __name__ == "__main__":
+    main()
