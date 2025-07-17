@@ -1,0 +1,8 @@
+# vuln-demo/config.py
+# pretend this is a config module leaking secrets
+
+AWS_ACCESS_KEY_ID     = "AKIAABCDEFGHIJKLMNO1"
+AWS_SECRET_ACCESS_KEY = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYDUMMYSECRETKEY"
+DATABASE_URL          = "postgresql://user:MyS3cr3tPass!@localhost:5432/dbname"
+API_TOKEN             = "123e4567-e89b-12d3-a456-426614174000"
+PASSWORD              = "P@ssw0rd123!"
