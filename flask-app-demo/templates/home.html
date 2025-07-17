@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Welcome{% endblock %}
+{% block content %}
+<style>
+  /* Override base.html margins and center the container absolutely */
+  .content-container {
+    margin: 0; /* removes the 50px auto margin */
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+  }
+</style>
+
+<h1 class="text-center">Welcome to the Demo Suite</h1>
+<p class="text-center">Select a demo from the navigation bar above.</p>
+{% endblock %}

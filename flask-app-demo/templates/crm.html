@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}CRM & Lead Management{% endblock %}
+
+{% block content %}
+  <h1>CRM & Lead Management</h1>
+  <p>Below is a list of current leads. In a real system, you might update their status or send automated emails.</p>
+  <table class="table table-striped">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Email</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for lead in leads %}
+      <tr>
+        <td>{{ lead.name }}</td>
+        <td>{{ lead.email }}</td>
+        <td>{{ lead.status }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="mt-4"><em>Simulating automated email campaign to leads...</em></p>
+{% endblock %}

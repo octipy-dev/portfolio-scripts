@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+{% block title %}Estimating{% endblock %}
+{% block content %}
+<h2 class="mb-4">Estimating &amp; Quoting</h2>
+
+<form method="POST" action="/estimating" class="mb-5" id="estimatingForm">
+  <!-- OpenAI API Key -->
+  <div class="form-group mb-3">
+    <label for="openai_api_key">OpenAI API Key</label>
+    <input type="text" class="form-control" id="openai_api_key" name="openai_api_key"
+           placeholder="Enter your OpenAI API Key" value="{{ openai_api_key or '' }}" required>
+  </div>
+
+  <!-- Job Details -->
+  <div class="form-group">
+    <label for="job_description">Job Description</label>
+    <input type="text" class="form-control" id="job_description" name="job_description" placeholder="Interior painting, exterior, etc."
+           value="{{ request.form.get('job_description','') }}">
+  </div>
+  <div class="form-group">
+    <label for="job_id">Job ID</label>
+    <input type="text" class="form-control" id="job_id" name="job_id" placeholder="12345"
+           value="{{ request.form.get('job_id','') }}">
+  </div>
+
+  <!-- Client Info -->
+  <h5>Client Information</h5>
+  <div class="form-group">
+    <label for="client_name">Name</label>
+    <input type="text" class="form-control" id="client_name" name="client_name"
+           value="{{ request.form.get('client_name','') }}">
+  </div>
+  <div class="form-group">
+    <label for="client_email">Email</label>
+    <input type="email" class="form-control" id="client_email" name="client_email"
+           value="{{ request.form.get('client_email','') }}">
+  </div>
+  <div class="form-group">
+    <label for="client_phone">Phone</label>
+    <input type="text" class="form-control" id="client_phone" name="client_phone"
+           value="{{ request.form.get('client_phone','') }}">
+  </div>
+  <div class="form-group">
+    <label for="client_address">Address</label>
+    <input type="text" class="form-control" id="client_address" name="client_address"
+           value="{{ request.form.get('client_address','') }}">
+  </div>
+
+  <!-- Employment Type -->
+  <div class="form-group">
+    <label for="employment_type">Employment Type</label>
+    <select class="form-control" id="employment_type" name="employment_type">
+      <option value="1099" {% if request.form.get('employment_type','1099') == '1099' %}selected{% endif %}>1099</option>
+      <option value="w2" {% if request.form.get('employment_type','1099') == 'w2' %}selected{% endif %}>W2</option>
+    </select>
+  </div>
+
+  <!-- Hours to Job Completion -->
+  <div class="form-group">
+    <label for="completion_hours">Hours to Job Completion</label>
+    <input type="number" step="0.01" class="form-control" id="completion_hours" name="completion_hours" placeholder="e.g. 40"
+           value="{{ request.form.get('completion_hours','') }}">
+  </div>
+
+  <!-- Foreman -->
+  <div class="form-check mb-3">
+    <input type="checkbox" class="form-check-input" id="foreman" name="foreman" value="yes"
+           {% if request.form.get('foreman') == 'yes' %}checked{% endif %}>
+    <label class="form-check-label" for="foreman">Foreman on job?</label>
+  </div>
+  <div class="form-row">
+    <div class="form-group col-md-4">
+      <label for="foreman_rate_type">Foreman Rate Type</label>
+      <select class="form-control" id="foreman_rate_type" name="foreman_rate_type">
+        <option value="hourly" {% if request.form.get('foreman_rate_type','hourly') == 'hourly' %}selected{% endif %}>Hourly</option>
+        <option value="flat" {% if request.form.get('foreman_rate_type','hourly') == 'flat' %}selected{% endif %}>Flat</option>
+      </select>
+    </div>
+    <div class="form-group col-md-4">
+      <label for="foreman_rate">Foreman Rate</label>
+      <input type="number" step="0.01" class="form-control" id="foreman_rate" name="foreman_rate" placeholder="e.g. 25.00"
+             value="{{ request.form.get('foreman_rate','') }}">
+    </div>
+    <div class="form-group col-md-4">
+      <label for="foreman_hours">Foreman Hours (if hourly)</label>
+      <input type="number" step="0.01" class="form-control" id="foreman_hours" name="foreman_hours" placeholder="e.g. 8"
+             value="{{ request.form.get('foreman_hours','') }}">
+    </div>
+  </div>
+
+  <!-- Crew Count -->
+  <div class="form-group col-md-4 pl-0">
+    <label for="crew_count">Number of Crew Members</label>
+    <input type="number" class="form-control" id="crew_count" name="crew_count" min="1" max="10"
+           value="{{ request.form.get('crew_count','1') }}" placeholder="e.g. 3">
+  </div>
+
+  <!-- Dynamic Crew Fields Appear Here -->
+  <div id="crewFieldsContainer"></div>
+
+  <!-- Additional Square Footage Field -->
+  <div class="form-group">
+    <label for="square_footage">Square Footage</label>
+    <input type="number" step="0.01" class="form-control" id="square_footage" name="square_footage" placeholder="Enter square footage">
+  </div>
+
+  <!-- Materials & Additional Costs -->
+  <div class="form-group">
+    <label for="materials_cost">Materials Cost</label>
+    <input type="number" step="0.01" class="form-control" id="materials_cost" name="materials_cost" placeholder="e.g. 500"
+           value="{{ request.form.get('materials_cost','') }}">
+  </div>
+  <div class="form-group">
+    <label for="overhead_percent">Overhead (%)</label>
+    <input type="number" step="0.01" class="form-control" id="overhead_percent" name="overhead_percent" placeholder="e.g. 10"
+           value="{{ request.form.get('overhead_percent','') }}">
+  </div>
+  <div class="form-group">
+    <label for="extra_cost">Extra Cost</label>
+    <input type="number" step="0.01" class="form-control" id="extra_cost" name="extra_cost" placeholder="e.g. 50"
+           value="{{ request.form.get('extra_cost','') }}">
+  </div>
+  <div class="form-group">
+    <label for="profit_goal_percent">Profit Goal (%)</label>
+    <input type="number" step="0.01" class="form-control" id="profit_goal_percent" name="profit_goal_percent" placeholder="e.g. 20"
+           value="{{ request.form.get('profit_goal_percent','') }}">
+  </div>
+
+  <!-- Get Vendors Button -->
+  <button type="button" class="btn btn-info mb-3" onclick="getVendors()">Get Vendors</button>
+
+  <!-- Vendors as separate clickable buttons -->
+  <div class="row" id="vendorButtonsContainer"></div>
+
+  <!-- Calculate & Clear -->
+  <div class="d-flex mt-3">
+    <button type="button" class="btn btn-primary mr-2" id="calculateBtn">Calculate Estimate</button>
+    <button type="button" class="btn btn-secondary" id="clearBtn">Clear Form</button>
+  </div>
+</form>
+
+{% if estimate %}
+  <div class="alert alert-info mt-4">
+    <h4>Estimate Results</h4>
+    <p><strong>Total Cost:</strong> ${{ "%.2f"|format(estimate.total_cost) }}</p>
+    <p><strong>Labor Cost (including W2 payroll tax if applicable):</strong> ${{ "%.2f"|format(estimate.total_labor_cost) }}</p>
+    <p><strong>Overhead Cost:</strong> ${{ "%.2f"|format(estimate.overhead_cost) }}</p>
+    <p><strong>Profit Amount:</strong> ${{ "%.2f"|format(estimate.profit_amount) }}</p>
+  </div>
+{% endif %}
+
+<!-- Bootstrap Modal for Product Suggestions -->
+<div class="modal fade" id="productModal" tabindex="-1" role="dialog" aria-labelledby="productModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="productModalLabel">Recommended Products</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body" id="productModalBody">
+        <!-- AI's recommended product table will appear here -->
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// DOM & form handling (unchanged)
+// ... existing script for crew fields generation, clear, calculate, etc.
+
+// Vendor lookup with API key
+async function getVendors() {
+  const apiKey = document.getElementById('openai_api_key').value.trim();
+  if (!apiKey) {
+    alert("OpenAI API key is required for vendor lookup.");
+    return;
+  }
+  const address = document.getElementById('client_address').value.trim();
+  if (!address) {
+    alert("Please enter an address to search for vendors.");
+    return;
+  }
+  const query = `Return a JSON array of paint store names within a 10 mile radius of "${address}".`;
+  try {
+    const response = await fetch("/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: query, api_key: apiKey })
+    });
+    const data = await response.json();
+    // ... rest of vendor parsing & UI update ...
+  } catch (error) {
+    console.error("Error fetching vendors:", error);
+    alert("Failed to fetch vendors from AI.");
+  }
+}
+
+// Product suggestions with API key
+async function suggestProducts(vendorName) {
+  const apiKey = document.getElementById('openai_api_key').value.trim();
+  if (!apiKey) {
+    alert("OpenAI API key is required for product suggestions.");
+    return;
+  }
+  const jobDesc = document.getElementById('job_description').value.trim() || "painting";
+  const query = `Given vendor '${vendorName}' and the job description '${jobDesc}', produce a plain text table with columns: 'Product Name' | 'Coverage (sq ft/gallon)' | 'Rating' | 'Price Range'. Provide only table rows without extra text.`;
+  try {
+    const response = await fetch("/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: query, api_key: apiKey })
+    });
+    const data = await response.json();
+    // ... build table & modal show ...
+  } catch (error) {
+    console.error("Error fetching product suggestions:", error);
+    document.getElementById('productModalBody').innerText = "Failed to fetch product suggestions from AI.";
+    $('#productModal').modal('show');
+  }
+}
+
+// Gallon estimation with API key
+async function estimateGallons(productName, coverage) {
+  const apiKey = document.getElementById('openai_api_key').value.trim();
+  if (!apiKey) {
+    alert("OpenAI API key is required for gallon estimation.");
+    return;
+  }
+  const jobDesc = document.getElementById('job_description').value.trim() || "painting";
+  const squareFootage = document.getElementById('square_footage').value;
+  if (!squareFootage) {
+    alert("Please enter the square footage to get an estimate for gallons needed.");
+    return;
+  }
+  const query = `For a job described as '${jobDesc}' with an area of ${squareFootage} square feet, using the product '${productName}' which covers ${coverage} square feet per gallon, estimate the number of gallons required. Return only the number.`;
+  try {
+    const response = await fetch("/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: query, api_key: apiKey })
+    });
+    const data = await response.json();
+    const result = data.assistant.replace(/<[^>]*>/g, "").trim();
+    alert(`Estimated gallons needed for ${productName}: ${result}`);
+  } catch (error) {
+    console.error("Error estimating gallons:", error);
+    alert("Failed to estimate gallons from AI.");
+  }
+}
+</script>
+{% endblock %}
