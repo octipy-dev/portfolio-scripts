@@ -1,0 +1,124 @@
+# Secret Scanner with Progress Bar
+
+A zero-dependency Python CLI tool that scans directories for hard‑coded secrets (API keys, passwords, tokens, etc.) and displays a sleek green progress bar during the scan. Perfect for quick security demos or integrating into CI checks.
+
+---
+
+## Features
+
+*  Recursively walks a target directory and scans every file.
+*  Out‑of‑the‑box regex patterns for common secrets:
+
+  * AWS Access Keys
+  * AWS Secret Keys
+  * Generic API Keys
+  * Password literals
+*  Real‑time progress bar (powered by [tqdm](https://github.com/tqdm/tqdm)) in **green**.
+*  Skips noise folders by default: `node_modules`, `.venv`, `__pycache__`.
+* ⚠ Prints filename, line number, and code snippet for each secret found.
+
+---
+
+## Installation
+
+1. Clone or download this repo alongside your project:
+
+   ```bash
+   git clone <your-repo-url>
+   cd <your-repo>/dev
+   ```
+
+2. (Optional) Create and activate a virtual environment:
+
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate   # bash/zsh
+   .venv\Scripts\Activate.ps1 # PowerShell
+   ```
+
+3. Install the only dependency:
+
+   ```bash
+   pip install tqdm
+   ```
+
+4. Make the script executable (Unix/macOS):
+
+   ```bash
+   chmod +x secret_scanner_with_progress.py
+   ```
+
+---
+
+## Usage
+
+```bash
+python secret_scanner_with_progress.py -d <target-folder>
+```
+
+### Options
+
+* `-d`, `--dir`
+
+  * Path to the directory you want to scan. Defaults to the current working directory.
+
+Example:
+
+```bash
+# Scan the "vuln-demo" folder for secrets
+python secret_scanner_with_progress.py -d vuln-demo
+```
+
+**Output** will look like:
+
+```
+Scanning /home/user/dev/vuln-demo for secrets…
+
+Scanning files:  42%|████████████▌              | 21/50 [00:00<00:00,  98.12file/s]
+
+⚠️  config.env
+   • AWS Access Key @ line 1: AKIAABCDEFGHIJKLMNO1
+   • AWS Secret Key @ line 2: wJalrXUtnFEMI/K7MDENG/bPxRfiCYDUMMYSECRETKEY
+
+⚠️  demo.py
+   • Generic API Key @ line 3: api_key: XyZ_AbC-9876543210
+
+ Scan complete.
+```
+
+---
+
+## Customization
+
+* **Add/Remove Patterns**: Open `secret_scanner_with_progress.py` and edit the `PATTERNS` dict with your own regexes.
+
+* **Skip Additional Folders**: Update the `if any(skip in root for skip in ...)` tuple to include other directories (e.g., `.git`, `dist`).
+
+* **Output**: Swap out `print` statements for a richer experience with [rich](https://github.com/Textualize/rich).
+
+---
+
+## Integration
+
+* **Git Hooks**: Add a pre-commit hook to block commits with leaked secrets.
+* **CI/CD**: Run this script as part of your pipeline to catch accidental commits before deployment.
+
+Example `.git/hooks/pre-commit`:
+
+```bash
+#!/usr/bin/env bash
+python secret_scanner_with_progress.py -d .
+if [ "$?" -ne 0 ]; then
+  echo "Leaked secrets detected! Commit aborted."
+  exit 1
+fi
+```
+
+
+
+
+
+
+
+
+
