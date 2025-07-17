@@ -1,0 +1,223 @@
+#!/usr/bin/env python3
+"""
+check_pii.py
+
+Standalone CLI for scanning text or files to detect potential PII.
+Includes a built-in compliance profile so you can run without external files.
+
+Features:
+  - Command-line or interactive mode for text or file input.
+  - Built-in default compliance profile (can be overridden via --profile).
+  - Regex-based PII patterns with base weights.
+  - Contextual and structural scoring boosts.
+  - Output in plain text or JSON formats.
+  - Exit code 0 = Accept (no violations), 1 = Reject (violations detected).
+
+Dependencies:
+  - PyYAML (only if you override with an external profile file)
+
+Install prerequisites:
+    pip install pyyaml
+
+Usage examples:
+  # Run with built-in default profile (no external file needed):
+  python check_pii.py -t "My SSN is 123-45-6789 and email user@example.com"
+  when prompted for "Enter text to scan:" answer "SSN", "Email", "Phone", etc...
+  
+  # Or specify a custom profile YAML:
+  python check_pii.py -t "..." --profile compliance_profile.yaml
+
+By default, the built-in profile blocks SSN and Email labels with thresholds:
+  SSN:     0.8
+  Email:   0.9
+"""
+import re
+import sys
+import argparse
+import json
+import yaml
+from typing import List, Tuple, Dict, Any
+
+# -----------------------------------------------------------------------------
+# Default Built-in Compliance Profile
+# -----------------------------------------------------------------------------
+DEFAULT_PROFILE: Dict[str, Any] = {
+    'blocked_labels': ['SSN', 'Email'],
+    'thresholds': {
+        'SSN': 0.8,
+        'Email': 0.9
+    }
+}
+
+# -----------------------------------------------------------------------------
+# PII Detection Patterns and Base Weights
+# -----------------------------------------------------------------------------
+PII_PATTERNS: Dict[str, Tuple[str, float]] = {
+    'SSN':           (r"\b\d{3}-\d{2}-\d{4}\b", 0.8),
+    'Passport':      (r"\b[A-PR-WYa-pr-wy][1-9]\d\s?\d{4}[1-9]\b", 0.6),
+    'DriverLicense': (r"\b[A-Z]{1,2}\d{4,10}\b", 0.5),
+    'Email':         (r"[A-Za-z0-9_.+-]+@[A-Za-z0-9-]+\.[A-Za-z0-9-.]+", 0.9),
+    'Phone':         (r"\b(?:\+?1[-.\s]?)*\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b", 0.7),
+    'Password':      (r"(?i)\bpassword\s*[:=]\s*['\"]?[\w@!#$%^&*()\-+=]{6,}['\"]?", 0.9),
+    'AWSAccessKey':  (r"\bAKIA[0-9A-Z]{16}\b", 0.9),
+    'AWSSecretKey':  (r"(?i)aws_secret_access_key\s*[:=]\s*[A-Za-z0-9/+=]{40}", 0.9),
+    'JWT':           (r"\beyJ[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+\b", 0.9),
+    'CreditCard':    (r"\b(?:\d[ -]*?){13,16}\b", 0.6),
+    'BankAccount':   (r"\b\d{8,17}\b", 0.5),
+    'RoutingNumber': (r"\b\d{9}\b", 0.5),
+    'USAddress':     (r"\b\d{1,5}\s+(?:[A-Za-z0-9]+\s){1,5}(Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd)\b", 0.5),
+    'ZipCode':       (r"\b\d{5}(?:-\d{4})?\b", 0.4),
+    'MedicalRecord': (r"\bMRN\s*[:=]\s*\d{6,10}\b", 0.6),
+}
+
+# -----------------------------------------------------------------------------
+# Scoring Boost Functions
+# -----------------------------------------------------------------------------
+
+def context_boost(text: str, match: re.Match) -> float:
+    """
+    +0.15 boost if a PII keyword appears within 20 characters before the match.
+    """
+    start = max(0, match.start() - 20)
+    window = text[start:match.start()]
+    if re.search(r"\b(SSN|social security|credit card|email|phone|password)\b", window, re.I):
+        return 0.15
+    return 0.0
+
+
+def luhn_valid(cc: str) -> bool:
+    """
+    Validate credit card numbers with the Luhn algorithm.
+    """
+    digits = [int(d) for d in re.sub(r"\D", "", cc)]
+    total = 0
+    parity = len(digits) % 2
+    for i, d in enumerate(digits):
+        if i % 2 == parity:
+            d *= 2
+            if d > 9:
+                d -= 9
+        total += d
+    return total % 10 == 0
+
+
+def structural_boost(label: str, match_str: str) -> float:
+    """
+    +0.2 boost for Luhn-valid credit card matches.
+    """
+    if label == 'CreditCard' and luhn_valid(match_str):
+        return 0.2
+    return 0.0
+
+# -----------------------------------------------------------------------------
+# Text and File Scanning
+# -----------------------------------------------------------------------------
+
+def scan_text(text: str, threshold: float) -> List[Tuple[str, str, float]]:
+    """
+    Scan a block of text for PII patterns, applying boosts, and filter by threshold.
+
+    Returns a list of (label, matched_string, score).
+    """
+    results = []  # type: List[Tuple[str, str, float]]
+    for label, (pattern, base) in PII_PATTERNS.items():
+        for m in re.finditer(pattern, text):
+            raw = m.group()
+            score = base + context_boost(text, m) + structural_boost(label, raw)
+            if score >= threshold:
+                results.append((label, raw, score))
+    return results
+
+
+def scan_file(path: str, threshold: float) -> List[Tuple[str, str, float]]:
+    """
+    Read a file from disk and scan its contents for PII.
+    """
+    with open(path, encoding='utf-8') as f:
+        content = f.read()
+    return scan_text(content, threshold)
+
+# -----------------------------------------------------------------------------
+# Command-Line Argument Parsing
+# -----------------------------------------------------------------------------
+
+def parse_args() -> argparse.Namespace:
+    """
+    Parse CLI arguments; --profile is optional thanks to the built-in default.
+    """
+    parser = argparse.ArgumentParser(description='Scan for PII in text or files.')
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument('-t', '--text', help='Text to scan.')
+    group.add_argument('-f', '--file', help='File to scan.')
+    parser.add_argument('-P', '--profile', help='Path to YAML compliance profile (optional).')
+    parser.add_argument('-s', '--threshold', type=float, default=0.5,
+                        help='Global score threshold for detection.')
+    parser.add_argument('-o', '--format', choices=('plain','json'), default='plain',
+                        help='Output format: plain or json.')
+    return parser.parse_args()
+
+# -----------------------------------------------------------------------------
+# Main Execution and Policy Enforcement
+# -----------------------------------------------------------------------------
+
+def main():
+    args = parse_args()
+
+    # Use external profile if provided, else built-in default
+    if args.profile:
+        try:
+            with open(args.profile, encoding='utf-8') as pf:
+                profile = yaml.safe_load(pf)
+        except Exception as e:
+            print(f"Error loading profile: {e}")
+            sys.exit(1)
+    else:
+        profile = DEFAULT_PROFILE
+
+    blocked_labels = profile.get('blocked_labels', [])
+    label_thresholds = profile.get('thresholds', {})
+
+    # Run scanning based on input mode
+    if args.text:
+        findings = scan_text(args.text, args.threshold)
+    elif args.file:
+        findings = scan_file(args.file, args.threshold)
+    else:
+        # Interactive text input if no flags provided
+        txt = input('Enter text to scan: ')
+        findings = scan_text(txt, args.threshold)
+
+    # Evaluate violations according to policy
+    violations = []
+    for label, raw, score in findings:
+        thresh = label_thresholds.get(label, args.threshold)
+        if label in blocked_labels or score >= thresh:
+            violations.append({'label': label, 'match': raw, 'score': round(score, 2)})
+
+    result = 'Reject' if violations else 'Accept'
+
+    # Output results
+    if args.format == 'json':
+        output = {
+            'findings': [{'label':l,'match':m,'score':round(s,2)} for l,m,s in findings],
+            'violations': violations,
+            'result': result
+        }
+        print(json.dumps(output, indent=2))
+    else:
+        if findings:
+            print('PII Findings:')
+            for l,m,s in findings:
+                print(f"  {l}: '{m}' (score {s:.2f})")
+        else:
+            print('No PII findings.')
+        if violations:
+            print('\nPolicy Violations:')
+            for v in violations:
+                print(f"  {v['label']}: '{v['match']}' (score {v['score']:.2f})")
+        print(f"\nResult: {result}")
+
+    sys.exit(1 if violations else 0)
+
+if __name__ == '__main__':
+    main()
