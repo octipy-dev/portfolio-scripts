@@ -1,0 +1,73 @@
+#!/usr/bin/env python3
+# -----------------------------------------------------------------------------
+# Script: xml_comment_counter.py
+# Description:
+#   Fetches XML data from a user-specified URL, parses all <count> elements,
+#   and computes the total sum of their integer values. Useful for processing
+#   XML-based comment feeds or count summaries.
+#
+# Workflow:
+#   1. Prompt the user for an XML URL (with an example default if blank).
+#   2. Retrieve the raw XML data via urllib.request.
+#   3. Parse the XML into an ElementTree structure.
+#   4. Find all <count> elements and convert their text to integers.
+#   5. Sum and display the total of all counts.
+#
+# Usage:
+#   python xml_comment_counter.py
+#   Enter URL: http://py4e-data.dr-chuck.net/comments_1692181.xml
+#   Sum of counts: 2553
+#
+# Requirements:
+#   - Python 3.x
+#   - No external libraries beyond the standard library
+# -----------------------------------------------------------------------------
+
+import urllib.request
+import xml.etree.ElementTree as ET
+import sys
+
+def fetch_xml(url: str) -> bytes:
+    """
+    Fetch the raw XML content from the given URL.
+    """
+    try:
+        with urllib.request.urlopen(url) as response:
+            return response.read()
+    except Exception as e:
+        print(f"Error fetching URL {url}: {e}")
+        sys.exit(1)
+
+
+def parse_and_sum(xml_data: bytes) -> int:
+    """
+    Parse XML data and sum the integer text of all <count> elements.
+    """
+    root = ET.fromstring(xml_data)
+    total = 0
+    for count_elem in root.findall('.//count'):
+        try:
+            total += int(count_elem.text)
+        except (TypeError, ValueError):
+            # Skip any non-integer or missing values
+            continue
+    return total
+
+
+def main():
+    """
+    Prompt for URL, fetch XML, compute sum of counts, and display.
+    """
+    url = input('Enter URL: ').strip()
+    if not url:
+        url = 'http://py4e-data.dr-chuck.net/comments_1692181.xml'
+
+    xml_data = fetch_xml(url)
+    total_sum = parse_and_sum(xml_data)
+
+    # Correct print statement with matching parentheses
+    print(f"Sum of counts: {total_sum}")
+
+
+if __name__ == '__main__':
+    main()
