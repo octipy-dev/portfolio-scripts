@@ -1,0 +1,73 @@
+# Flask App Demo
+
+This is a full-featured demo Flask application demonstrating:
+
+-  US address geocoding with chart and Google Maps integration
+-  AI chatbot powered by OpenAI's GPT API
+-  Estimating interface with dynamic forms and cost calculations
+-  User-supplied API key fields for OpenAI and Google Maps (no secrets stored)
+
+---
+
+##  Getting Started
+
+### Requirements
+
+- Python 3.9+
+- `pip install -r requirements.txt`
+
+### Run the App
+
+```bash
+# From inside flask-app-demo/
+flask run
+```
+
+Open `http://127.0.0.1:5000` in your browser.
+
+---
+
+##  API Keys
+
+This app **does not store secrets**. You must supply:
+
+- Google Maps API Key — for address geocoding
+- OpenAI API Key — for chatbot and vendor/product assistance
+
+Enter them via secure UI prompts when needed.
+
+---
+
+##  Structure
+
+```
+flask-app-demo/
+├── app.py                # App factory
+├── chatbot.py            # AI assistant endpoint
+├── estimating.py         # Quote estimator logic
+├── address.py            # Google Maps geocoder
+├── templates/            # Jinja2 HTML
+├── static/               # CSS, JS, images
+└── .gitignore            # Excludes pycache, venv, secrets
+```
+
+---
+
+##  Deployment Tips
+
+- Use `gunicorn` or `waitress` for production
+- Inject secrets via environment variables
+- Behind a reverse proxy like NGINX or Heroku
+
+---
+
+##  Disclaimer
+
+This repo has been scrubbed of secrets via history rewriting.
+Never commit live API keys. Use `.env` or input fields instead.
+
+---
+
+Made with ❤ for learning and showcasing Flask patterns.
+
+> GitHub: [octipy-dev](https://github.com/octipy-dev)
