@@ -1,87 +1,51 @@
-import sqlite3
+import ssl
+import urllib.request
+import re
+from bs4 import BeautifulSoup
 
 # -----------------------------------------------------------------------------
-# Script: count_email_domains.py
-# Purpose:
-#   - Read a mailbox file (default 'mbox.txt'), extract sender domains,
-#     count how many messages come from each domain, and store those counts
-#     in a SQLite database for easy querying and persistence.
+# Script: sum_spans.py
+# Description:
+#   Prompts the user for a URL of an HTML page, fetches the page (skipping SSL
+#   certificate checks), parses out all <span> elements containing digits, and
+#   prints both the count of those numbers and their total sum.
 #
-# Workflow:
-#   1. Connect to (or create) the SQLite database 'orgdb.sqlite'.
-#   2. Recreate the Counts table (domain, count) from scratch.
-#   3. Prompt the user for a filename (default 'mbox.txt').
-#   4. Parse each line starting with 'From: ', extract the domain part
-#      of the email address, and update its count in the database.
-#   5. Commit all changes once parsing is done.
-#   6. Query and print the top 10 domains by message count.
-#
-# Benefits of this approach:
-#   - Persistence: Counts are stored on disk and survive script restarts.
-#   - Flexibility: You can change the final SELECT to get different reports.
-#   - Performance: By committing once after the loop, we minimize disk I/O.
+#   Common use-case: Counting comment totals on pages like Dr. Chuck’s
+#   “comments_*.html” files in the Python for Everybody exercises.
 # -----------------------------------------------------------------------------
 
-# 1. Open (or create) the SQLite database and obtain a cursor
-conn = sqlite3.connect('orgdb.sqlite')   # creates the file if it doesn't exist
-cur = conn.cursor()
+# 1. Create an SSL context that ignores certificate verification errors
+ctx = ssl.create_default_context()
+ctx.check_hostname = False
+ctx.verify_mode = ssl.CERT_NONE
 
-# 2. Reset the Counts table for a fresh run
-cur.execute('DROP TABLE IF EXISTS Counts')  
-cur.execute('''
-    CREATE TABLE Counts (
-        org   TEXT,      -- email domain, e.g. "gmail.com"
-        count INTEGER    -- number of messages from that domain
-    )
-''')
+# 2. Prompt for the URL (default to a known example if the user just hits Enter)
+url = input('ENTER URL: ')
+if not url:
+    url = 'http://py4e-data.dr-chuck.net/comments_1692181.html'
 
-# 3. Prompt for the mailbox filename
-fname = input('Enter file name: ')
-if len(fname) < 1:
-    fname = 'mbox.txt'
-fh = open(fname)
+# 3. Fetch the HTML from the URL
+try:
+    response = urllib.request.urlopen(url, context=ctx)
+    html = response.read()
+except Exception as e:
+    print(f'Error fetching {url}: {e}')
+    exit(1)
 
-# 4. Iterate over each line and update counts
-for line in fh:
-    # Skip lines that don't begin with "From: "
-    if not line.startswith('From: '):
-        continue
+# 4. Parse the HTML using BeautifulSoup
+soup = BeautifulSoup(html, 'html.parser')
 
-    # Split the line into words; the second word is email address
-    parts = line.split()
-    email = parts[1]                # e.g. "user@example.com"
-    domain = email.split('@')[1]    # everything after '@'
+# 5. Find all <span> tags in the document
+tags = soup.find_all('span')
 
-    # Look up the current count for this domain
-    cur.execute('SELECT count FROM Counts WHERE org = ?', (domain,))
-    row = cur.fetchone()
+# 6. Extract integers from each <span> and collect them
+numbers = []
+for tag in tags:
+    text = tag.get_text()              # e.g. "97"
+    found = re.findall(r'\d+', text)   # match one or more digits
+    if found:
+        numbers.append(int(found[0]))  # convert first matched number to int
 
-    if row is None:
-        # Domain not seen before → insert with count = 1
-        cur.execute(
-            'INSERT INTO Counts (org, count) VALUES (?, 1)',
-            (domain,)
-        )
-    else:
-        # Domain exists → increment its count
-        cur.execute(
-            'UPDATE Counts SET count = count + 1 WHERE org = ?',
-            (domain,)
-        )
-
-# 5. Commit all inserts/updates in one go for better performance
-conn.commit()
-
-# 6. Retrieve and display the top 10 domains by count
-print('\nTop 10 email domains:')
-for org, cnt in cur.execute('''
-    SELECT org, count
-      FROM Counts
-  ORDER BY count DESC
-     LIMIT 10
-'''):
-    print(f'{org:20} {cnt}')
-
-# Clean up resources
-cur.close()
-conn.close()
+# 7. Compute and display the results
+print('Count:', len(numbers))           # how many numbers were found
+print('Sum:  ', sum(numbers))          # the total of all those numbers
