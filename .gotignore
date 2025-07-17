@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Editor / IDE
+.idea/
+.vscode/
+*.sublime-workspace
+*.sublime-project
+
+# Jupyter / Data files
+.ipynb_checkpoints/
+*.sqlite3
+*.log
+
+# OS / Misc
+.DS_Store
+Thumbs.db
+
+# Flask-specific
+instance/
+*.db
+*.env
