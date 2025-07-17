@@ -1,0 +1,73 @@
+# --------------------------------------------------------------------------------
+# Project Cost Calculator
+#
+# This script calculates the total cost of a project by combining:
+#   1. Labor cost   = time_hours × hourly_rate
+#   2. Material cost (as provided)
+#   3. Square‐footage cost = square_footage × cost_per_sqft
+#   4. Overhead      = (labor + materials + sqft_cost) × (overhead_percentage / 100)
+#
+# The final total_cost is the sum of all four components.
+# --------------------------------------------------------------------------------
+
+def calculate_total_cost(
+    time_hours,
+    hourly_rate,
+    material_cost,
+    square_footage,
+    cost_per_sqft,
+    overhead_percentage
+):
+    """
+    Compute the total project cost.
+
+    Parameters:
+      time_hours         (float): Number of labor hours.
+      hourly_rate        (float): Cost per labor hour.
+      material_cost      (float): Raw cost of materials.
+      square_footage     (float): Size of project area in square feet.
+      cost_per_sqft      (float): Additional cost per square foot.
+      overhead_percentage(float): Indirect cost markup (e.g., insurance, admin).
+
+    Returns:
+      float: The sum of labor, materials, sqft cost, and overhead.
+    """
+    # 1. Calculate labor component
+    labor_cost = time_hours * hourly_rate
+
+    # 2. Material cost (renamed for clarity)
+    material_cost_total = material_cost
+
+    # 3. Cost based on square footage
+    square_footage_cost = square_footage * cost_per_sqft
+
+    # 4. Overhead as a percentage of the sum of the above three
+    overhead_cost = (labor_cost + material_cost_total + square_footage_cost) * (overhead_percentage / 100)
+
+    # 5. Total cost is the sum of all components
+    total_cost = labor_cost + material_cost_total + square_footage_cost + overhead_cost
+
+    return total_cost
+
+
+# ------------------------------
+# Gather user input and display
+# ------------------------------
+if __name__ == "__main__":
+    time_hours          = float(input("Enter the total time in hours: "))
+    hourly_rate         = float(input("Enter the hourly rate: "))
+    material_cost       = float(input("Enter the total material cost: "))
+    square_footage      = float(input("Enter the total square footage: "))
+    cost_per_sqft       = float(input("Enter the cost per square foot: "))
+    overhead_percentage = float(input("Enter the overhead percentage: "))
+
+    # Compute and print the result, formatted to two decimal places
+    total_cost = calculate_total_cost(
+        time_hours,
+        hourly_rate,
+        material_cost,
+        square_footage,
+        cost_per_sqft,
+        overhead_percentage
+    )
+    print(f"The total cost of the project is: ${total_cost:.2f}")
