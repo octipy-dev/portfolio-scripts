@@ -1,0 +1,94 @@
+#!/usr/bin/env python3
+# -----------------------------------------------------------------------------
+# Script: job_costing.py
+# Description:
+#   Defines a JobCosting class for computing the direct labor, material, overhead,
+#   and total costs of a job based on provided inputs.
+#   Includes a simple CLI that prompts the user for job details and prints a
+#   formatted cost summary.
+#
+# Workflow:
+#   1. Prompt for job name, direct labor hours, labor rate, material cost, and
+#      overhead rate (as a decimal fraction, e.g., 0.15 for 15%).
+#   2. Instantiate a JobCosting object with those values.
+#   3. Compute and display:
+#        - Direct labor cost
+#        - Material cost
+#        - Overhead cost
+#        - Total job cost
+#
+# Benefits:
+#   - Encapsulates cost calculations in a reusable class.
+#   - Clear separation of cost components and total calculation.
+#   - Input validation could be extended as needed.
+# -----------------------------------------------------------------------------
+
+class JobCosting:
+    """Represents a job with labor, material, and overhead costs."""
+    def __init__(self, job_name: str, direct_labor_hours: float,
+                 labor_rate_per_hour: float, material_cost: float,
+                 overhead_rate: float):
+        # Basic input sanity checks (could be expanded)
+        if direct_labor_hours < 0:
+            raise ValueError("Direct labor hours must be non-negative.")
+        if labor_rate_per_hour < 0:
+            raise ValueError("Labor rate per hour must be non-negative.")
+        if material_cost < 0:
+            raise ValueError("Material cost must be non-negative.")
+        if overhead_rate < 0:
+            raise ValueError("Overhead rate must be non-negative.")
+
+        self.job_name = job_name
+        self.direct_labor_hours = direct_labor_hours
+        self.labor_rate_per_hour = labor_rate_per_hour
+        self.material_cost = material_cost
+        self.overhead_rate = overhead_rate
+
+    def calculate_direct_labor_cost(self) -> float:
+        """Calculates direct labor cost = hours * rate per hour."""
+        return self.direct_labor_hours * self.labor_rate_per_hour
+
+    def calculate_overhead_cost(self) -> float:
+        """Calculates overhead cost as a fraction of direct labor cost."""
+        direct_cost = self.calculate_direct_labor_cost()
+        return direct_cost * self.overhead_rate
+
+    def calculate_total_cost(self) -> float:
+        """Returns sum of direct labor, material, and overhead costs."""
+        return (self.calculate_direct_labor_cost() +
+                self.material_cost +
+                self.calculate_overhead_cost())
+
+    def __str__(self) -> str:
+        """Formats a summary string of all cost components and total."""
+        dl = self.calculate_direct_labor_cost()
+        oh = self.calculate_overhead_cost()
+        total = self.calculate_total_cost()
+        return (
+            f"Job: {self.job_name}\n"
+            f"  Direct Labor Cost: ${dl:.2f}\n"
+            f"  Material Cost:     ${self.material_cost:.2f}\n"
+            f"  Overhead Cost:     ${oh:.2f}\n"
+            f"  Total Job Cost:    ${total:.2f}"
+        )
+
+
+def main():
+    """CLI: prompt for job details, compute costs, and print summary."""
+    # Gather inputs from the user
+    name = input("Enter job name: ").strip()
+    hours = float(input("Enter direct labor hours: ").strip())
+    rate = float(input("Enter labor rate per hour: ").strip())
+    material = float(input("Enter material cost: ").strip())
+    overhead = float(input(
+        "Enter overhead rate (decimal, e.g. 0.15 for 15%): ").strip()
+    )
+
+    # Instantiate and display
+    job = JobCosting(name, hours, rate, material, overhead)
+    print("\nCost Summary:")
+    print(job)
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,109 @@
+#!/usr/bin/env python3
+"""
+roster_hexcode.py
+
+Standalone script to compute the roster lookup code from a
+SQLite "rosterdb.sqlite" database using the XYZZY+hex query.
+
+This script:
+  1. Connects to the specified SQLite database file (default: rosterdb.sqlite).
+  2. Executes the query:
+       SELECT 'XYZZY' || hex(User.name || Course.title || Member.role) AS code
+         FROM User
+         JOIN Member ON User.id = Member.user_id
+         JOIN Course ON Course.id = Member.course_id
+       ORDER BY code
+       LIMIT 1;
+  3. Prints the resulting code.
+
+Usage:
+    python roster_hexcode.py [--db PATH]
+
+Options:
+    --db PATH    Path to the SQLite database file (default: rosterdb.sqlite)
+
+Dependencies:
+    Built-in sqlite3 module
+
+Exit Codes:
+    0 on success, 1 on error (e.g., database file not found or query error)
+"""
+import sqlite3
+import argparse
+import sys
+
+# -----------------------------------------------------------------------------
+# Core Functionality
+# -----------------------------------------------------------------------------
+def compute_code(db_path: str) -> str:
+    """
+    Connect to SQLite DB at db_path, run the XYZZY+hex query, and return the code.
+
+    Raises:
+        FileNotFoundError: if db_path does not exist or cannot be opened.
+        sqlite3.Error: on SQL execution issues.
+    """
+    # Open connection
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+
+    # Define and execute the query to compute the code
+    query = """
+        SELECT 'XYZZY' || hex(User.name || Course.title || Member.role) AS code
+          FROM User
+          JOIN Member ON User.id = Member.user_id
+          JOIN Course ON Course.id = Member.course_id
+        ORDER BY code
+        LIMIT 1;
+    """
+    cur.execute(query)
+    row = cur.fetchone()
+
+    # Clean up resources
+    cur.close()
+    conn.close()
+
+    if row is None:
+        raise ValueError("No rows returned by the query.")
+    return row[0]
+
+# -----------------------------------------------------------------------------
+# Command-Line Interface
+# -----------------------------------------------------------------------------
+
+def parse_args() -> argparse.Namespace:
+    """
+    Parse command-line arguments.
+    """
+    parser = argparse.ArgumentParser(
+        description="Compute XYZZY+hex roster lookup code from a SQLite DB."
+    )
+    parser.add_argument(
+        '--db', default='rosterdb.sqlite',
+        help='Path to the SQLite database file (default: rosterdb.sqlite)'
+    )
+    return parser.parse_args()
+
+# -----------------------------------------------------------------------------
+# Main Entrypoint
+# -----------------------------------------------------------------------------
+
+def main() -> None:
+    args = parse_args()
+
+    try:
+        code = compute_code(args.db)
+        print(code)
+        sys.exit(0)
+    except sqlite3.OperationalError as e:
+        print(f"Database error: {e}", file=sys.stderr)
+        sys.exit(1)
+    except FileNotFoundError:
+        print(f"Database file not found: {args.db}", file=sys.stderr)
+        sys.exit(1)
+    except ValueError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+if __name__ == '__main__':
+    main()

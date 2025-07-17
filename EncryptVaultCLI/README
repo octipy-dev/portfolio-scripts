@@ -1,0 +1,134 @@
+# Logic: init, put, list, get
+# pass: hello
+
+# 1) Initialize your vault (run once)
+
+python -m vault_cli.vault_cli init
+
+# 2) Encrypt & store a file
+
+python -m vault_cli.vault_cli put /path/to/your/file.txt
+
+# 3) List vault contents
+
+python -m vault_cli.vault_cli list
+
+# 4) Retrieve & decrypt a file
+
+python -m vault_cli.vault_cli get file.txt --out /path/to/output/dir
+
+# If installed as a console script, you can drop the “python -m …” prefix:
+
+vault_cli init
+vault_cli put /path/to/your/file.txt
+vault_cli list
+vault_cli get file.txt --out /path/to/output/dir
+
+# To see full usage/help for any command:
+
+python -m vault_cli.vault_cli --help
+python -m vault_cli.vault_cli put --help
+
+
+# Developer Guide: Vault CLI
+
+This guide documents the internals, architecture, and testability of the `vault_cli` encrypted file vault project.
+
+---
+
+##  Project Overview
+
+This tool provides a **local encrypted vault** for safely storing and retrieving sensitive files using a master password. It's implemented as a user-friendly Python CLI using:
+
+- **Click** for command-line interface handling
+- **PyCryptodome** for AES-GCM encryption
+- **PBKDF2** key derivation (HMAC-SHA1, 100,000 iterations)
+- **Salted symmetric encryption** with auto-generated IVs and authentication tags
+
+Vault contents are stored under:
+`~/.vault_cli/`
+with each encrypted file named `<original>.enc` and the shared salt saved in `salt.bin`.
+
+---
+
+##  Architecture
+
+**Encryption Flow:**
+
+1. User enters master password
+2. `PBKDF2(password + salt)` → 256-bit AES key
+3. `encrypt_bytes()` wraps data with AES-GCM → outputs `nonce + tag + ciphertext`
+4. File is stored as `filename.enc` in `~/.vault_cli/`
+
+**Decryption Flow:**
+
+1. User enters master password
+2. Key is re-derived using saved salt
+3. `decrypt_bytes()` validates tag, decrypts payload
+4. File is written to desired output directory
+
+---
+
+##  Local Dev Setup
+
+```bash
+# Create venv and install requirements
+python -m venv .venv
+source .venv/bin/activate       # or .venv\Scripts\Activate.ps1 on Windows
+pip install -r requirements.txt
+```
+
+To test encryption and retrieval:
+
+```bash
+# 1. Initialize the vault
+python -m vault_cli init
+
+# 2. Encrypt and store a file
+python -m vault_cli put /path/to/your/file.txt
+
+# 3. List contents
+python -m vault_cli list
+
+# 4. Retrieve and decrypt
+python -m vault_cli get file.txt --out /path/to/output
+```
+
+> CLI also supports `vault_cli init` etc. if installed as an entrypoint.
+
+---
+
+##  Files & Structure
+
+```
+vault_cli/
+├── crypto.py         # Encryption, decryption, key derivation
+├── vault_cli.py      # CLI commands: init, put, get, list
+├── requirements.txt  # Dependencies: click, pycryptodome
+```
+
+---
+
+##  Test Strategy
+
+Tests are not included yet, but here's the suggested test structure:
+
+- `tests/test_crypto.py`
+  - Validate key derivation
+  - AES-GCM encrypt/decrypt roundtrip
+  - Tampered ciphertext triggers failure
+
+- `tests/test_vault_cli.py`
+  - Use `CliRunner` from `click.testing`
+  - Simulate file input/output with `tmp_path`
+  - Patch file reads/writes to avoid touching real user data
+
+---
+
+##  Future Enhancements
+
+- Add unit + CLI tests
+- Support multiple keys / identities
+- Encrypt metadata (e.g. filenames)
+- Shard vault storage across directories
+- Upload/download vault to S3 or external blob storage

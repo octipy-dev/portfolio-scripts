@@ -1,0 +1,51 @@
+import ssl
+import urllib.request
+import re
+from bs4 import BeautifulSoup
+
+# -----------------------------------------------------------------------------
+# Script: sum_spans.py
+# Description:
+#   Prompts the user for a URL of an HTML page, fetches the page (skipping SSL
+#   certificate checks), parses out all <span> elements containing digits, and
+#   prints both the count of those numbers and their total sum.
+#
+#   Common use-case: Counting comment totals on pages like Dr. Chuck’s
+#   “comments_*.html” files in the Python for Everybody exercises.
+# -----------------------------------------------------------------------------
+
+# 1. Create an SSL context that ignores certificate verification errors
+ctx = ssl.create_default_context()
+ctx.check_hostname = False
+ctx.verify_mode = ssl.CERT_NONE
+
+# 2. Prompt for the URL (default to a known example if the user just hits Enter)
+url = input('ENTER URL: ')
+if not url:
+    url = 'http://py4e-data.dr-chuck.net/comments_1692181.html'
+
+# 3. Fetch the HTML from the URL
+try:
+    response = urllib.request.urlopen(url, context=ctx)
+    html = response.read()
+except Exception as e:
+    print(f'Error fetching {url}: {e}')
+    exit(1)
+
+# 4. Parse the HTML using BeautifulSoup
+soup = BeautifulSoup(html, 'html.parser')
+
+# 5. Find all <span> tags in the document
+tags = soup.find_all('span')
+
+# 6. Extract integers from each <span> and collect them
+numbers = []
+for tag in tags:
+    text = tag.get_text()              # e.g. "97"
+    found = re.findall(r'\d+', text)   # match one or more digits
+    if found:
+        numbers.append(int(found[0]))  # convert first matched number to int
+
+# 7. Compute and display the results
+print('Count:', len(numbers))           # how many numbers were found
+print('Sum:  ', sum(numbers))          # the total of all those numbers

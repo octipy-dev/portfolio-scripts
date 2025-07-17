@@ -1,0 +1,125 @@
+#!/usr/bin/env python3
+# -----------------------------------------------------------------------------
+# Script: housing_price_predictor.py
+# Description:
+#   Loads a housing dataset from CSV, cleans and prepares the data,
+#   trains a linear regression model to predict prices, evaluates its
+#   performance, and visualizes actual vs. predicted prices.
+#
+# Workflow:
+#   1. Prompt the user for the CSV file path.
+#   2. Load data into a Pandas DataFrame, inspect, and clean missing values.
+#   3. Specify feature columns and the target column.
+#   4. Split into training and test sets.
+#   5. Train a LinearRegression model.
+#   6. Evaluate using MSE and R² metrics.
+#   7. Plot actual vs. predicted prices.
+#
+# Usage:
+#   python housing_price_predictor.py
+#   Enter CSV file path: path/to/your/zillow_data.csv
+# -----------------------------------------------------------------------------
+
+import matplotlib.pyplot as plt
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error, r2_score
+
+
+def load_and_clean_data(path: str) -> pd.DataFrame:
+    """
+    Loads CSV from `path`, prints basic info, drops missing values, and returns cleaned DataFrame.
+    """
+    # Load the dataset
+    data = pd.read_csv(path)
+
+    # Inspect first five rows
+    print("\nFirst five rows:")
+    print(data.head())
+
+    # Summary of missing data
+    print("\nMissing values per column:")
+    print(data.isnull().sum())
+
+    # Descriptive statistics
+    print("\nDataset description:")
+    print(data.describe())
+
+    # Drop any rows with missing values
+    data = data.dropna()
+    return data
+
+
+def train_and_evaluate(
+    data: pd.DataFrame,
+    feature_cols: list[str],
+    target_col: str
+) -> tuple[LinearRegression, float, float]:
+    """
+    Splits the data, trains LinearRegression, and returns the model, MSE, and R² metrics.
+    """
+    # Features and target
+    X = data[feature_cols]
+    y = data[target_col]
+
+    # Split into training and testing sets (80/20 split)
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42
+    )
+
+    # Initialize and train the model
+    model = LinearRegression()
+    model.fit(X_train, y_train)
+
+    # Predict on the test set
+    y_pred = model.predict(X_test)
+
+    # Compute evaluation metrics
+    mse = mean_squared_error(y_test, y_pred)
+    r2 = r2_score(y_test, y_pred)
+
+    return model, mse, r2, y_test, y_pred
+
+
+def plot_results(y_test, y_pred) -> None:
+    """
+    Creates a scatter plot of actual vs. predicted values.
+    """
+    plt.scatter(y_test, y_pred)
+    plt.xlabel('Actual Prices')
+    plt.ylabel('Predicted Prices')
+    plt.title('Actual vs Predicted Prices')
+    plt.grid(True)
+    plt.show()
+
+
+def main():
+    """
+    Main CLI: orchestrates data loading, model training, evaluation, and plotting.
+    """
+    # 1. Prompt for input file path
+    path = input("Enter CSV file path: ").strip()
+
+    # 2. Load and clean data
+    data = load_and_clean_data(path)
+
+    # 3. Define features & target (replace with your actual column names)
+    feature_cols = ['feature1', 'feature2', 'feature3']  # e.g. ['bedrooms', 'bathrooms', 'sqft']
+    target_col = 'price'
+
+    # 4-6. Train the model and compute metrics
+    model, mse, r2, y_test, y_pred = train_and_evaluate(
+        data, feature_cols, target_col
+    )
+
+    # 7. Report metrics
+    print(f"\nMean Squared Error: {mse:.2f}")
+    print(f"R-squared: {r2:.2f}\n")
+
+    # 8. Plot actual vs. predicted
+    plot_results(y_test, y_pred)
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,97 @@
+#!/usr/bin/env python3
+# -----------------------------------------------------------------------------
+# Script: xml_comment_counter_v2.py
+# Description:
+#   Fetches XML data from a user-specified URL (or default), parses all <count>
+#   elements, prints each retrieved count for debugging, and then outputs both
+#   the total number of counts and their sum.
+#
+# Workflow:
+#   1. Prompt the user for an XML URL (default to a known example if blank).
+#   2. Retrieve the raw XML via urllib.request, reporting bytes retrieved.
+#   3. Parse the XML into an ElementTree.
+#   4. Locate all <count> elements anywhere in the document.
+#   5. For each <count>:
+#        - Print its text (debug).
+#        - Convert to integer and collect into a list.
+#   6. After looping, print:
+#        - Count: number of <count> elements found.
+#        - Sum: sum of all extracted integer values.
+#
+# Usage:
+#   python xml_comment_counter_v2.py
+#   Enter location: [enter or paste URL]
+# -----------------------------------------------------------------------------
+
+import urllib.request
+import xml.etree.ElementTree as ET
+import sys
+
+
+def fetch_data(url: str) -> bytes:
+    """
+    Retrieve raw data from the URL, handling errors.
+
+    Args:
+        url (str): URL to fetch.
+
+    Returns:
+        bytes: Content of the response.
+    """
+    try:
+        with urllib.request.urlopen(url) as response:
+            data = response.read()
+            print(f"Retrieved {len(data)} characters")
+            return data
+    except Exception as e:
+        print(f"Error retrieving {url}: {e}")
+        sys.exit(1)
+
+
+def parse_counts(xml_bytes: bytes) -> list[int]:
+    """
+    Parse XML bytes and extract integer values from all <count> tags.
+
+    Args:
+        xml_bytes (bytes): Raw XML content.
+
+    Returns:
+        List[int]: List of integer values from each <count> element.
+    """
+    try:
+        root = ET.fromstring(xml_bytes)
+    except ET.ParseError as e:
+        print(f"XML parse error: {e}")
+        sys.exit(1)
+
+    counts = []
+    # Find all <count> tags anywhere in the document
+    for count_elem in root.findall('.//count'):
+        text = count_elem.text or ''
+        print(text)  # Debug: print each count as retrieved
+        try:
+            counts.append(int(text))
+        except ValueError:
+            # Skip non-integer or empty values
+            continue
+    return counts
+
+
+def main():
+    """Main routine: prompt for URL, fetch, parse, and report counts."""
+    url = input('Enter location: ').strip()
+    if not url:
+        url = 'http://py4e-data.dr-chuck.net/comments_42.xml'
+    print(f"Retrieving {url}")
+    data = fetch_data(url)
+
+    # Parse and extract counts
+    nums = parse_counts(data)
+
+    # Output final count and sum
+    print(f"Count: {len(nums)}")
+    print(f"Sum:   {sum(nums)}")
+
+
+if __name__ == '__main__':
+    main()

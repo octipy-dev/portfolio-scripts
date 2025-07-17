@@ -1,0 +1,179 @@
+#!/usr/bin/env python3
+"""
+roster_import_json.py
+
+Standalone script to import roster data from a JSON file into a SQLite database.
+
+This script performs the following steps:
+  1. Parses command-line arguments for JSON input and SQLite DB path.
+  2. Connects to (or creates) the specified SQLite database.
+  3. Drops and recreates the tables: User, Course, Member.
+  4. Loads a list of (name, title, role) records from a JSON file.
+  5. Inserts or updates User, Course, and Member tables accordingly.
+  6. Commits changes and exits with status code 0 on success.
+
+Usage:
+    python roster_import_json.py [--json PATH] [--db PATH]
+
+Options:
+    --json PATH   Path to input JSON file (default: roster_data.json)
+    --db PATH     Path to SQLite DB file (default: rosterdb.sqlite)
+
+Dependencies:
+    Uses only Python standard library: json, sqlite3, argparse, sys.
+"""
+import json
+import sqlite3
+import argparse
+import sys
+
+# -----------------------------------------------------------------------------
+# SQL schema for the roster database
+# -----------------------------------------------------------------------------
+SCHEMA_SQL = """
+DROP TABLE IF EXISTS User;
+DROP TABLE IF EXISTS Course;
+DROP TABLE IF EXISTS Member;
+
+CREATE TABLE User (
+    id   INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT UNIQUE,
+    name TEXT UNIQUE
+);
+
+CREATE TABLE Course (
+    id    INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT UNIQUE,
+    title TEXT UNIQUE
+);
+
+CREATE TABLE Member (
+    user_id   INTEGER,
+    course_id INTEGER,
+    role      INTEGER,
+    PRIMARY KEY (user_id, course_id)
+);
+"""
+
+# -----------------------------------------------------------------------------
+# Command-line argument parsing
+# -----------------------------------------------------------------------------
+def parse_args() -> argparse.Namespace:
+    """
+    Parse CLI arguments for JSON input and DB path.
+
+    Returns:
+        Namespace with 'json' and 'db' attributes.
+    """
+    parser = argparse.ArgumentParser(
+        description='Import roster JSON into SQLite database.'
+    )
+    parser.add_argument(
+        '--json', default='roster_data.json',
+        help='Path to input JSON file (default: roster_data.json)'
+    )
+    parser.add_argument(
+        '--db', default='rosterdb.sqlite',
+        help='Path to SQLite DB file (default: rosterdb.sqlite)'
+    )
+    return parser.parse_args()
+
+# -----------------------------------------------------------------------------
+# Database initialization
+# -----------------------------------------------------------------------------
+
+def init_db(conn: sqlite3.Connection) -> None:
+    """
+    Initialize or reset the roster database schema.
+
+    Drops existing tables and recreates User, Course, Member.
+    """
+    cur = conn.cursor()
+    cur.executescript(SCHEMA_SQL)
+    conn.commit()
+
+# -----------------------------------------------------------------------------
+# JSON import logic
+# -----------------------------------------------------------------------------
+
+def import_roster(conn: sqlite3.Connection, json_path: str) -> None:
+    """
+    Read roster entries from JSON and insert into the database.
+
+    JSON structure: list of [name, course_title, role]
+    where 'role' is an integer.
+    """
+    try:
+        with open(json_path, 'r', encoding='utf-8') as f:
+            records = json.load(f)
+    except FileNotFoundError:
+        print(f"Error: JSON file not found: {json_path}", file=sys.stderr)
+        sys.exit(1)
+    except json.JSONDecodeError as e:
+        print(f"Error: Invalid JSON in {json_path}: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    cur = conn.cursor()
+    for entry in records:
+        try:
+            name, title, role = entry
+        except ValueError:
+            print(f"Skipping malformed entry: {entry}", file=sys.stderr)
+            continue
+
+        # Insert or ignore User
+        cur.execute(
+            'INSERT OR IGNORE INTO User (name) VALUES (?)',
+            (name,)
+        )
+        cur.execute(
+            'SELECT id FROM User WHERE name = ?',
+            (name,)
+        )
+        user_id = cur.fetchone()[0]
+
+        # Insert or ignore Course
+        cur.execute(
+            'INSERT OR IGNORE INTO Course (title) VALUES (?)',
+            (title,)
+        )
+        cur.execute(
+            'SELECT id FROM Course WHERE title = ?',
+            (title,)
+        )
+        course_id = cur.fetchone()[0]
+
+        # Insert or replace Member record
+        cur.execute(
+            '''
+            INSERT OR REPLACE INTO Member (user_id, course_id, role)
+            VALUES (?, ?, ?)
+            ''',
+            (user_id, course_id, int(role))
+        )
+    conn.commit()
+
+# -----------------------------------------------------------------------------
+# Main entry point
+# -----------------------------------------------------------------------------
+
+def main() -> None:
+    args = parse_args()
+
+    # Connect to (or create) the SQLite database
+    try:
+        conn = sqlite3.connect(args.db)
+    except sqlite3.Error as e:
+        print(f"Error opening database {args.db}: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    # Initialize schema
+    init_db(conn)
+
+    # Import JSON data
+    import_roster(conn, args.json)
+
+    # Clean up
+    conn.close()
+    print(f"Import complete. Data loaded into {args.db}.")
+
+if __name__ == '__main__':
+    main()

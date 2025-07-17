@@ -1,0 +1,92 @@
+#!/usr/bin/env python3
+"""
+drive_sheets_tool.py
+
+Standalone dummy CLI for testing Drive & Sheets operations without calling real APIs.
+This script hardcodes sample data to simulate:
+  - Authentication
+  - Listing Google Drive files
+  - Creating a Google Sheet
+
+No external API calls or credentials are needed.
+
+Usage:
+  python drive_sheets_tool.py
+
+Expected behavior:
+  - Prints a fixed list of "files".
+  - Prompts for a sheet title and prints a dummy spreadsheet ID.
+"""
+
+import sys
+
+# ----------------------------------------------------------------------------
+# Dummy Data for Simulation
+# ----------------------------------------------------------------------------
+DUMMY_DRIVE_FILES = [
+    {'id': 'file1', 'name': 'Document1.txt'},
+    {'id': 'file2', 'name': 'Presentation.pptx'},
+    {'id': 'file3', 'name': 'Spreadsheet.xlsx'},
+]
+
+# Counter for dummy sheet IDs
+_sheet_counter = 100
+
+# ----------------------------------------------------------------------------
+# Simulated Functions
+# ----------------------------------------------------------------------------
+
+def authenticate():
+    """
+    Simulate authentication. No real API calls are made.
+
+    Returns:
+        A dummy "service" tuple (drive_service, sheets_service).
+    """
+    print("[SIMULATION] Authenticating (dummy)... Done.")
+    # Return dummy placeholders
+    return object(), object()
+
+
+def list_google_drive_files(drive_service, page_size: int = 10):
+    """
+    Simulate listing files in Google Drive using dummy data.
+    """
+    print("Listing files (dummy data):")
+    for file in DUMMY_DRIVE_FILES[:page_size]:
+        print(f"  {file['name']} ({file['id']})")
+
+
+def create_google_sheets(sheets_service, title: str):
+    """
+    Simulate creating a Google Sheet and return a dummy ID.
+    """
+    global _sheet_counter
+    _sheet_counter += 1
+    dummy_id = f"sheet_{_sheet_counter}"
+    print(f"Spreadsheet created (dummy) with ID: {dummy_id}")
+    return dummy_id
+
+# ----------------------------------------------------------------------------
+# Main Entrypoint
+# ----------------------------------------------------------------------------
+
+def main() -> None:
+    """
+    Entry point: simulate authentication, list files, create a sheet.
+    """
+    # Simulate auth
+    drive_service, sheets_service = authenticate()
+
+    # Simulate listing Drive files
+    list_google_drive_files(drive_service)
+
+    # Prompt for new spreadsheet title
+    title = input('Enter title for new Google Sheet: ').strip()
+    if not title:
+        title = 'Dummy Sheet'
+    # Simulate sheet creation
+    create_google_sheets(sheets_service, title)
+
+if __name__ == '__main__':
+    main()

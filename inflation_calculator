@@ -1,0 +1,199 @@
+#!/usr/bin/env python3
+"""
+Inflation Adjustment Tool using FRED API [requires: fredapi API_KEY] 
+
+This script adjusts a historical dollar amount to its equivalent in a target
+year’s dollars by fetching CPI data directly from the Federal Reserve's FRED
+database via the `fredapi` library.
+
+Features:
+  • Fetches monthly CPI data (series ID: CPIAUCSL) for any two years.
+  • Defaults to January CPI for each year; falls back to earliest month of year.
+  • Handles target years beyond data availability by falling back to latest year.
+  • Provides both CLI (argparse) and interactive modes.
+  • Detailed comments explain each step and design choice.
+"""
+
+import os
+import sys
+import argparse
+import datetime
+import pandas as pd
+from fredapi import Fred
+
+# -----------------------------------------------------------------------------
+# Constants & Configuration
+# -----------------------------------------------------------------------------
+FRED_SERIES_ID = "CPIAUCSL"  # CPI for All Urban Consumers: All Items
+ENV_VAR_KEY    = "FRED_API_KEY"  # Environment variable holding your FRED API key
+
+# -----------------------------------------------------------------------------
+# Helper: Initialize FRED client
+# -----------------------------------------------------------------------------
+def init_fred_client() -> Fred:
+    """
+    Create and return a Fred client using the API key from the environment.
+    Raises RuntimeError if the API key is missing.
+    """
+    api_key = os.getenv(ENV_VAR_KEY)
+    if not api_key:
+        raise RuntimeError(
+            f"Missing environment variable {ENV_VAR_KEY}. "
+            "Obtain a free FRED API key from https://fred.stlouisfed.org/ and set it."
+        )
+    return Fred(api_key=api_key)
+
+# -----------------------------------------------------------------------------
+# Helper: Fetch CPI for a given year
+# -----------------------------------------------------------------------------
+def get_annual_cpi(fred: Fred, year: int) -> float:
+    """
+    Retrieve the CPI value for January of the specified year.
+    If January data is unavailable, fall back to the earliest month in that year.
+
+    Parameters:
+      fred (Fred): Initialized FRED client.
+      year (int): Calendar year (e.g., 1990).
+
+    Returns:
+      float: CPI index value for the chosen month.
+
+    Raises:
+      ValueError: If no CPI data exists for the given year.
+    """
+    start = f"{year}-01-01"
+    end   = f"{year}-12-31"
+    try:
+        series: pd.Series = fred.get_series(
+            FRED_SERIES_ID,
+            observation_start=start,
+            observation_end=end
+        )
+    except Exception as e:
+        # Network errors or invalid series ID
+        raise ValueError(f"Error fetching CPI data for {year}: {e}")
+
+    if series.empty:
+        # No CPI entries found in that year
+        raise ValueError(f"No CPI data available for year {year}")
+
+    # series is indexed by Timestamps; take the first (earliest) value
+    return float(series.iloc[0])
+
+# -----------------------------------------------------------------------------
+# Core: Inflation Adjustment Logic
+# -----------------------------------------------------------------------------
+def adjust_for_inflation(
+    fred: Fred,
+    amount: float,
+    from_year: int,
+    to_year: int = None
+) -> (float, int):
+    """
+    Compute inflation-adjusted value of `amount` from `from_year` dollars to
+    `to_year` dollars using the CPIAUCSL series.
+
+    If `to_year` is None, default to the current calendar year.
+    If CPI is missing for `to_year`, automatically fall back to the latest
+    available CPI year.
+
+    Returns a tuple (adjusted_amount, effective_to_year).
+    """
+    # 1. Default target to current year
+    if to_year is None:
+        to_year = datetime.datetime.now().year
+
+    # 2. Input validation
+    if not isinstance(from_year, int) or not isinstance(to_year, int):
+        raise TypeError("`from_year` and `to_year` must be integers")
+    if from_year > to_year:
+        raise ValueError(
+            f"`from_year` ({from_year}) cannot exceed `to_year` ({to_year})"
+        )
+
+    # 3. Fetch CPI for the source year
+    cpi_from = get_annual_cpi(fred, from_year)
+
+    # 4. Attempt to fetch CPI for target year, with fallback
+    try:
+        cpi_to = get_annual_cpi(fred, to_year)
+        effective_year = to_year
+    except ValueError:
+        # Fallback: find latest available CPI year in entire series
+        # Download full series and inspect last index date
+        full_series: pd.Series = fred.get_series(FRED_SERIES_ID)
+        last_date = full_series.index.max()
+        effective_year = last_date.year
+        cpi_to = float(full_series.iloc[-1])
+        print(
+            f"⚠ CPI data for {to_year} not available; "
+            f"falling back to latest available year {effective_year}."
+        )
+
+    # 5. Compute adjusted amount
+    adjusted_amount = amount * (cpi_to / cpi_from)
+    return adjusted_amount, effective_year
+
+# -----------------------------------------------------------------------------
+# CLI and Interactive I/O
+# -----------------------------------------------------------------------------
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Adjust a historical dollar amount for inflation using FRED API."
+    )
+    parser.add_argument(
+        "amount",
+        type=float,
+        help="Original dollar amount (e.g. 1000.00)"
+    )
+    parser.add_argument(
+        "from_year",
+        type=int,
+        help="Year of the original amount (e.g. 1985)"
+    )
+    parser.add_argument(
+        "--to-year", "-t",
+        type=int,
+        default=None,
+        help="Target year for adjustment (defaults to current year)"
+    )
+    return parser.parse_args()
+
+
+def main():
+    # 1) Initialize FRED client (errors if API key missing)
+    fred = init_fred_client()
+
+    # 2) Decide mode: CLI if args passed, else interactive
+    if len(sys.argv) >= 3:
+        args = parse_args()
+        amount, from_year, to_year = (
+            args.amount, args.from_year, args.to_year
+        )
+    else:
+        print("Interactive mode: please enter the values below.")
+        amount    = float(input("Enter the original amount in dollars: "))
+        from_year = int(input("Enter the original year (e.g. 1990): "))
+        raw       = input(
+            "Enter the target year [leave blank for current year]: "
+        ).strip()
+        to_year   = int(raw) if raw else None
+
+    # 3) Perform the inflation adjustment
+    try:
+        adjusted, effective_year = adjust_for_inflation(
+            fred, amount, from_year, to_year
+        )
+    except Exception as e:
+        print(f"Error: {e}")
+        sys.exit(1)
+
+    # 4) Display the result
+    print(
+        f"\n💰 ${amount:,.2f} in {from_year} is approximately "
+        f"${adjusted:,.2f} in {effective_year}.\n"
+    )
+
+
+if __name__ == "__main__":
+    main()

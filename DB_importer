@@ -1,0 +1,200 @@
+#!/usr/bin/env python3
+"""
+track_importer.py
+
+Standalone script to import track data from a CSV into a SQLite database,
+handle schema creation, and display a summary report.
+
+Features:
+  - Drops and recreates tables: Artist, Genre, Album, Track
+  - Reads a CSV file (default: tracks.csv) and populates the database
+  - Inserts or updates artists, genres, albums, and tracks with proper
+    foreign-key relationships
+  - Commits all changes and prints the first three tracks ordered by
+    artist name and track title
+
+Usage:
+    python track_importer.py [--csv PATH] [--db PATH]
+
+Options:
+    --csv PATH   Path to input CSV file (default: tracks.csv)
+    --db PATH    Path to SQLite DB file (default: tracks.sqlite)
+
+Dependencies:
+    None beyond Python standard library (sqlite3, csv, argparse)
+"""
+import sqlite3
+import csv
+import argparse
+import sys
+
+# -----------------------------------------------------------------------------
+# Database Schema SQL
+# -----------------------------------------------------------------------------
+SCHEMA_SQL = """
+DROP TABLE IF EXISTS Track;
+DROP TABLE IF EXISTS Album;
+DROP TABLE IF EXISTS Artist;
+DROP TABLE IF EXISTS Genre;
+
+CREATE TABLE Artist (
+    id   INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT UNIQUE,
+    name TEXT UNIQUE
+);
+
+CREATE TABLE Genre (
+    id   INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT UNIQUE,
+    name TEXT UNIQUE
+);
+
+CREATE TABLE Album (
+    id        INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT UNIQUE,
+    title     TEXT UNIQUE,
+    artist_id INTEGER
+);
+
+CREATE TABLE Track (
+    id       INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT UNIQUE,
+    title    TEXT UNIQUE,
+    album_id INTEGER,
+    genre_id INTEGER,
+    len      INTEGER,
+    rating   INTEGER,
+    count    INTEGER
+);
+"""
+
+# -----------------------------------------------------------------------------
+# Functions
+# -----------------------------------------------------------------------------
+def init_db(conn: sqlite3.Connection) -> None:
+    """
+    Initialize (or reset) the database schema.
+    Drops existing tables and creates fresh ones.
+    """
+    cur = conn.cursor()
+    cur.executescript(SCHEMA_SQL)
+    conn.commit()
+
+
+def import_csv(conn: sqlite3.Connection, csv_path: str) -> None:
+    """
+    Parse the CSV file and insert data into the database.
+
+    Expects CSV rows: title, artist, album, play_count, rating, length_ms, genre
+    """
+    cur = conn.cursor()
+    try:
+        with open(csv_path, newline='', encoding='utf-8') as f:
+            reader = csv.reader(f)
+            for row in reader:
+                title, artist, album, play_count, rating, length_ms, genre = row
+
+                # 1) Artist
+                cur.execute(
+                    "INSERT OR IGNORE INTO Artist (name) VALUES (?)",
+                    (artist,)
+                )
+                cur.execute(
+                    "SELECT id FROM Artist WHERE name = ?",
+                    (artist,)
+                )
+                artist_id = cur.fetchone()[0]
+
+                # 2) Genre
+                cur.execute(
+                    "INSERT OR IGNORE INTO Genre (name) VALUES (?)",
+                    (genre,)
+                )
+                cur.execute(
+                    "SELECT id FROM Genre WHERE name = ?",
+                    (genre,)
+                )
+                genre_id = cur.fetchone()[0]
+
+                # 3) Album
+                cur.execute(
+                    "INSERT OR IGNORE INTO Album (title, artist_id) VALUES (?, ?)",
+                    (album, artist_id)
+                )
+                cur.execute(
+                    "SELECT id FROM Album WHERE title = ?",
+                    (album,)
+                )
+                album_id = cur.fetchone()[0]
+
+                # 4) Track
+                cur.execute(
+                    """
+                    INSERT OR REPLACE INTO Track
+                      (title, album_id, genre_id, len, rating, count)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        title,
+                        album_id,
+                        genre_id,
+                        int(length_ms),
+                        int(rating),
+                        int(play_count)
+                    )
+                )
+        conn.commit()
+    except FileNotFoundError:
+        print(f"CSV file not found: {csv_path}")
+        sys.exit(1)
+
+
+def print_report(conn: sqlite3.Connection, limit: int = 3) -> None:
+    """
+    Print the first `limit` tracks ordered by Artist.name then Track.title.
+    """
+    cur = conn.cursor()
+    print(f"First {limit} tracks by Artist.name, then Track.title:")
+    query = """
+        SELECT Track.title, Artist.name, Album.title, Genre.name
+          FROM Track
+          JOIN Genre  ON Track.genre_id  = Genre.id
+          JOIN Album  ON Track.album_id  = Album.id
+          JOIN Artist ON Album.artist_id = Artist.id
+        ORDER BY Artist.name, Track.title
+        LIMIT ?;
+    """
+    for row in cur.execute(query, (limit,)):
+        print(row)
+
+# -----------------------------------------------------------------------------
+# Main Entrypoint
+# -----------------------------------------------------------------------------
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description='Import tracks CSV into SQLite and report.'
+    )
+    parser.add_argument(
+        '--csv', default='tracks.csv',
+        help='Path to input CSV file (default: tracks.csv)'
+    )
+    parser.add_argument(
+        '--db', default='tracks.sqlite',
+        help='Path to SQLite DB file (default: tracks.sqlite)'
+    )
+    args = parser.parse_args()
+
+    # Connect to (or create) the database
+    conn = sqlite3.connect(args.db)
+
+    # Initialize schema
+    init_db(conn)
+
+    # Import CSV data
+    import_csv(conn, args.csv)
+
+    # Print summary report
+    print_report(conn)
+
+    # Clean up
+    conn.close()
+
+if __name__ == '__main__':
+    main()

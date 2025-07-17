@@ -1,0 +1,90 @@
+#!/usr/bin/env python3
+import urllib.request
+from bs4 import BeautifulSoup
+
+# -----------------------------------------------------------------------------
+# Script: link_follower.py
+# Description:
+#   Given a starting URL, this script fetches the page, extracts all hyperlinks
+#   (<a href="...">), and then repeatedly follows the link at a specified
+#   position for a given number of steps. Useful for tracing chained links
+#   or navigating sequences of pages programmatically.
+#
+# Workflow:
+#   1. Prompt the user for:
+#        - A starting URL
+#        - A zero-based start position (index into the list of links)
+#        - A count of how many times to follow the link at that position
+#   2. Fetch and parse the starting page to build a list of all links.
+#   3. In a loop of 'count' iterations:
+#        - Select the link at 'start_position', print it, and set it as the new URL.
+#        - Re-fetch and parse the new URL's links for the next iteration.
+#
+# Benefits:
+#   - Automates the manual process of clicking through a sequence of links.
+#   - Can be used for scraping patterns of chained pages (e.g., puzzles,
+#     advent calendars, or paginated galleries).
+#   - Simple, dependency-light: only uses urllib and BeautifulSoup.
+# -----------------------------------------------------------------------------
+
+def get_links(url):
+    """Fetches the HTML from `url` and returns a list of all href values."""
+    # Open the URL and read the raw HTML
+    response = urllib.request.urlopen(url)
+    html = response.read()
+
+    # Parse the HTML with BeautifulSoup using the built-in HTML parser
+    soup = BeautifulSoup(html, "html.parser")
+
+    # Extract all <a> tags and collect their 'href' attributes
+    links = []
+    for anchor in soup.find_all("a"):
+        href = anchor.get("href")
+        if href:
+            links.append(href)
+    return links
+
+
+def follow_links(url, start_position, count):
+    """Follows the link at `start_position` for `count` iterations, printing each URL."""
+    current_url = url
+    for i in range(count):
+        # Retrieve all links from the current page
+        links = get_links(current_url)
+
+        # Guard against invalid positions
+        if not links:
+            print(f"No links found at {current_url}. Stopping.")
+            return
+        if start_position < 0 or start_position >= len(links):
+            print(f"Position {start_position} out of range (0..{len(links)-1}). Stopping.")
+            return
+
+        # Select the link at the given position
+        next_url = links[start_position]
+        print(f"Retrieving ({i+1}/{count}): {next_url}")
+
+        # Update for the next iteration
+        current_url = next_url
+
+
+def main():
+    """Orchestrates user input and the link-following process."""
+    # Prompt the user for inputs
+    url = input("Enter the starting URL: ").strip()
+    start_index = input("Enter start position (0-based index): ").strip()
+    count = input("Enter number of times to follow the link: ").strip()
+
+    try:
+        start_index = int(start_index)
+        count = int(count)
+    except ValueError:
+        print("Start position and count must be integers.")
+        return
+
+    # Invoke the link-following logic
+    follow_links(url, start_index, count)
+
+
+if __name__ == "__main__":
+    main()
