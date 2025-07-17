@@ -1,0 +1,101 @@
+#!/usr/bin/env python3
+# -----------------------------------------------------------------------------
+# Script: xml_count_summarizer.py
+# Description:
+#   Fetches XML data from a user-specified URL, parses all <count> elements
+#   under <comments>, and outputs both the number of comments and the sum of
+#   their count values. Ensures robust error handling and clear output.
+#
+# Workflow:
+#   1. Prompt the user for an XML URL (default to a known example if blank).
+#   2. Retrieve the raw XML data via urllib.request.
+#   3. Parse the XML into an ElementTree structure.
+#   4. Locate all <count> elements under the 'comments/comment' path.
+#   5. Compute:
+#        - Total number of <count> elements (comment count entries).
+#        - Sum of their integer values.
+#   6. Print the results.
+#
+# Usage:
+#   python xml_count_summarizer.py
+#   Enter link: http://py4e-data.dr-chuck.net/comments_1692181.xml
+#   Retrieving http://py4e-data.dr-chuck.net/comments_1692181.xml
+#   Retrieved 4189 characters
+#   Count: 50
+#   Sum: 2553
+#
+# Requirements:
+#   - Python 3.x
+#   - Standard library only (urllib, xml.etree)
+# -----------------------------------------------------------------------------
+import urllib.request
+import xml.etree.ElementTree as ET
+import sys
+
+def fetch_xml(url: str) -> bytes:
+    """
+    Fetches the raw XML content from the given URL.
+
+    Args:
+        url (str): URL pointing to XML resource.
+
+    Returns:
+        bytes: Raw XML data.
+
+    Exits:
+        On error, prints message and exits the program.
+    """
+    try:
+        with urllib.request.urlopen(url) as response:
+            data = response.read()
+            print(f"Retrieving {url}")
+            print(f"Retrieved {len(data)} characters")
+            return data
+    except Exception as e:
+        print(f"Error fetching URL {url}: {e}")
+        sys.exit(1)
+
+def parse_counts(xml_data: bytes) -> tuple[int, int]:
+    """
+    Parses XML data and returns a tuple of (comment_count, total_sum).
+
+    Args:
+        xml_data (bytes): Raw XML content.
+
+    Returns:
+        (int, int):
+            - Number of <count> elements found.
+            - Sum of their integer values.
+    """
+    try:
+        root = ET.fromstring(xml_data)
+    except ET.ParseError as e:
+        print(f"Error parsing XML: {e}")
+        sys.exit(1)
+
+    # Find each <comment> element under <comments> and its <count>
+    comment_elements = root.findall('.//comments/comment')
+    counts = []
+    for comment in comment_elements:
+        count_elem = comment.find('count')
+        if count_elem is not None and count_elem.text and count_elem.text.isdigit():
+            counts.append(int(count_elem.text))
+
+    comment_count = len(counts)
+    total_sum = sum(counts)
+    return comment_count, total_sum
+
+def main():
+    """Main function: orchestrates fetching, parsing, and output."""
+    url = input('Enter link: ').strip()
+    if not url:
+        url = 'http://py4e-data.dr-chuck.net/comments_1692181.xml'
+
+    xml_data = fetch_xml(url)
+    comment_count, total_sum = parse_counts(xml_data)
+
+    print(f"Count: {comment_count}")
+    print(f"Sum:   {total_sum}")
+
+if __name__ == '__main__':
+    main()
