@@ -1,0 +1,83 @@
+#!/usr/bin/env python3
+"""
+Onboarding Cost Calculator
+
+This script estimates the total cost of onboarding new employees by summing:
+  1. Training costs
+  2. Administrative costs
+  3. Productivity loss costs
+
+Each component is calculated per employee and aggregated for multiple hires.
+"""
+
+def calculate_onboarding_cost(
+    num_employees: int,
+    training_cost_per_employee: float,
+    admin_cost_per_employee: float,
+    productivity_loss_per_employee: float
+) -> float:
+    """
+    Calculate total onboarding cost for a given number of employees.
+
+    Parameters:
+      num_employees                 (int)   : The number of new hires.
+      training_cost_per_employee   (float) : Direct training expenses per hire (e.g., materials, instructor fees).
+      admin_cost_per_employee      (float) : Indirect administrative expenses per hire (e.g., HR processing time).
+      productivity_loss_per_employee (float) : Estimated productivity loss per hire (e.g., ramp-up period cost).
+
+    Returns:
+      float: Total onboarding cost combining training, admin, and productivity loss.
+    """
+    # Calculate the total training expense
+    total_training_cost = num_employees * training_cost_per_employee
+
+    # Calculate the total administrative expense
+    total_admin_cost = num_employees * admin_cost_per_employee
+
+    # Calculate the aggregate cost of reduced productivity
+    total_productivity_loss = num_employees * productivity_loss_per_employee
+
+    # Sum all cost components to get the overall onboarding cost
+    total_onboarding_cost = (
+        total_training_cost
+        + total_admin_cost
+        + total_productivity_loss
+    )
+
+    return total_onboarding_cost
+
+
+if __name__ == "__main__":
+    # Prompt for the number of employees to onboard
+    num_employees = int(
+        input("Enter number of new employees: ")
+    )
+
+    # Prompt for direct training cost per employee
+    training_cost_per_employee = float(
+        input("Enter training cost per employee: ")
+    )
+
+    # Prompt for administrative cost per employee
+    admin_cost_per_employee = float(
+        input("Enter administrative cost per employee: ")
+    )
+
+    # Prompt for estimated productivity loss cost per employee
+    productivity_loss_per_employee = float(
+        input("Enter productivity loss per employee: ")
+    )
+
+    # Calculate the total onboarding cost
+    total_onboarding_cost = calculate_onboarding_cost(
+        num_employees,
+        training_cost_per_employee,
+        admin_cost_per_employee,
+        productivity_loss_per_employee
+    )
+
+    # Display the result, formatted to two decimal places for currency
+    print(
+        f"Total onboarding cost for {num_employees} "
+        f"employees is: ${total_onboarding_cost:.2f}"
+    )  # e.g., Total onboarding cost for 5 employees is: $12500.00
