@@ -1,0 +1,361 @@
+#!/usr/bin/env python3
+"""
+Standalone Scraper and Reporter Script
+
+This script provides a complete, single-file solution to:
+  1. Prompt the user for a target URL to scrape.
+  2. Verify that scraping is permitted by checking robots.txt and,
+     if provided, the site’s Terms of Service for known disallowed phrases.
+  3. Fetch multiple page variants (root, /about, /services, /blog) from the site.
+  4. Parse the raw HTML responses into plain text for analysis.
+  5. Use the OpenAI GPT API to:
+       a. Extract concise business insights from the combined text.
+       b. Assign a numeric score to those insights.
+       c. Generate a proposed action plan (strategy) based on the insights.
+  6. Export the resulting data (URL, insights, score, strategy) to both:
+       - A CSV file (default: report.csv)
+       - A PDF file (default: report.pdf)
+
+Dependencies:
+    requests           # For HTTP requests and robots.txt parsing
+    beautifulsoup4     # For HTML parsing to plain text
+    openai             # For GPT-driven content analysis
+    reportlab          # For PDF report generation
+
+Install prerequisites via:
+    pip install requests beautifulsoup4 openai reportlab
+
+Usage:
+    python run_insights.py
+
+At each prompt, you may accept the default by pressing Enter or supply a custom value.
+"""
+
+import os
+import json
+import requests
+from urllib.parse import urlparse, urljoin
+from urllib.robotparser import RobotFileParser
+from bs4 import BeautifulSoup
+import openai
+import csv
+import io
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet
+
+# ----------------------------------------------------------------------------
+# Compliance Helpers
+# ----------------------------------------------------------------------------
+
+# List of phrases indicating scraping is disallowed in Terms of Service text
+RISKY_PHRASES = [
+    "you may not scrape",
+    "no automated access",
+    "commercial use prohibited"
+]
+
+def fetch_robots_txt(domain: str, target_url: str) -> bool:
+    """
+    Download and parse a site's robots.txt file.
+
+    Args:
+        domain: The domain (host) part of the target URL.
+        target_url: The full URL intended for scraping.
+
+    Returns:
+        True if the robots.txt policy allows scraping target_url, False otherwise.
+    """
+    robots_url = f"https://{domain}/robots.txt"
+    try:
+        response = requests.get(robots_url, timeout=10)
+        if response.status_code == 200:
+            parser = RobotFileParser()
+            # Parse robots.txt directives from the response text
+            parser.parse(response.text.splitlines())
+            is_allowed = parser.can_fetch("*", target_url)
+            if not is_allowed:
+                print(f"Disallowed by robots.txt: {robots_url}")
+            return is_allowed
+    except Exception as e:
+        print(f"Error fetching robots.txt: {e}")
+    # If robots.txt is missing or fails to parse, default to denying access
+    return False
+
+
+def fetch_tos(domain: str, tos_url: str) -> bool:
+    """
+    Download and inspect a Terms of Service page for disallowed content.
+
+    Args:
+        domain: The domain (host) of the site.
+        tos_url: URL of the Terms of Service page.
+
+    Returns:
+        True if no risky phrases are found, False otherwise.
+    """
+    try:
+        response = requests.get(tos_url, timeout=10)
+        if response.status_code == 200:
+            # Extract all text and normalize to lowercase for search
+            text = BeautifulSoup(response.text, "html.parser").get_text().lower()
+            # Identify any disallowed phrases
+            found = [phrase for phrase in RISKY_PHRASES if phrase in text]
+            if found:
+                print(f"Blocked by ToS phrases: {found}")
+                return False
+            return True
+        else:
+            print(f"Terms of Service URL returned status {response.status_code}")
+    except Exception as e:
+        print(f"Error fetching Terms of Service: {e}")
+    # If ToS cannot be verified, default to denying access
+    return False
+
+class ComplianceChecker:
+    """
+    Aggregates robots.txt and optional Terms of Service checks.
+    """
+    def __init__(self, url: str):
+        # Parse the input URL to extract the domain for compliance checks
+        parsed = urlparse(url)
+        self.url = url
+        self.domain = parsed.netloc
+
+    def is_allowed(self) -> bool:
+        """
+        Perform both robots.txt and (if provided) ToS checks.
+
+        Returns:
+            True if both checks pass, False otherwise.
+        """
+        # 1) Check robots.txt
+        if not fetch_robots_txt(self.domain, self.url):
+            return False
+
+        # 2) Optionally check Terms of Service
+        tos_url = input(f"Enter ToS URL for {self.domain} (blank to skip): ").strip()
+        if tos_url:
+            return fetch_tos(self.domain, tos_url)
+        return True
+
+# ----------------------------------------------------------------------------
+# Core Scraping and Analysis
+# ----------------------------------------------------------------------------
+
+class Fetcher:
+    """
+    Simple HTTP fetcher supporting optional proxy configuration.
+    """
+    def __init__(self, proxy: str = None):
+        self.session = requests.Session()
+        if proxy:
+            # Configure proxy for HTTP and HTTPS
+            self.session.proxies.update({'http': proxy, 'https': proxy})
+
+    def fetch_text(self, page_url: str) -> str:
+        """
+        Send a GET request and return the response body as text.
+
+        Raises:
+            HTTPError if the server responds with an error status.
+        """
+        response = self.session.get(page_url, timeout=10)
+        response.raise_for_status()
+        return response.text
+
+class TextParser:
+    """
+    Converts raw HTML markup into plain text by stripping tags.
+    """
+    def parse(self, html: str) -> str:
+        # Use BeautifulSoup to extract visible text, preserving newlines
+        return BeautifulSoup(html, "html.parser").get_text(separator="\n")
+
+class GPTService:
+    """
+    Interfaces with OpenAI API to extract insights, score them, and generate strategy.
+    """
+    def __init__(self, api_key: str = None):
+        # Allow passing API key or fallback to environment variable
+        openai.api_key = api_key or os.getenv("OPENAI_API_KEY")
+
+    def extract_insights(self, text: str) -> str:
+        """
+        Prompt GPT to extract concise business insights from input text.
+        """
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": "Extract concise business insights."},
+                {"role": "user",   "content": text}
+            ]
+        )
+        return response.choices[0].message.content.strip()
+
+    def score_insights(self, insights: str) -> int:
+        """
+        Prompt GPT to assign a numeric score (1-100) to the insights.
+        """
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": "Score these insights 1-100."},
+                {"role": "user",   "content": insights}
+            ]
+        )
+        try:
+            return int(response.choices[0].message.content.strip())
+        except ValueError:
+            return 0
+
+    def generate_strategy(self, insights: str) -> str:
+        """
+        Prompt GPT to suggest a strategic action plan based on insights.
+        """
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": "Suggest a strategic action plan."},
+                {"role": "user",   "content": insights}
+            ]
+        )
+        return response.choices[0].message.content.strip()
+
+class ScrapeManager:
+    """
+    Top-level orchestrator combining compliance, fetching, parsing, and GPT analysis.
+    """
+    # Define which URL paths to visit on the target site
+    PAGE_PATHS = ["", "about", "services", "blog"]
+
+    def __init__(self, url: str, api_key: str = None, proxy: str = None):
+        print(f"Initializing ScrapeManager for {url}")
+        self.url = url
+        self.compliance = ComplianceChecker(url)
+        self.fetcher = Fetcher(proxy=proxy)
+        self.parser = TextParser()
+        self.gpt     = GPTService(api_key=api_key)
+
+    def extract(self) -> dict:
+        """
+        Execute scraping and GPT analysis, returning a results dictionary:
+          { 'url', 'insights', 'score', 'strategy' }
+        """
+        print(f"Starting extraction for {self.url}")
+        if not self.compliance.is_allowed():
+            return {"error": "Blocked by compliance"}
+
+        # Gather text from each page variant
+        segments = []
+        for path in self.PAGE_PATHS:
+            full_url = urljoin(self.url, path)
+            try:
+                html_text = self.fetcher.fetch_text(full_url)
+                segments.append(self.parser.parse(html_text))
+            except Exception as e:
+                print(f"Failed to fetch {full_url}: {e}")
+
+        # Combine all segments into one large prompt
+        combined_text = "\n\n".join(segments)
+        insights = self.gpt.extract_insights(combined_text)
+        score    = self.gpt.score_insights(insights)
+        strategy = self.gpt.generate_strategy(insights)
+
+        # Return structured results
+        return {
+            "url":      self.url,
+            "insights": insights,
+            "score":    score,
+            "strategy": strategy
+        }
+
+# ----------------------------------------------------------------------------
+# Report Generation Functions
+# ----------------------------------------------------------------------------
+
+def generate_csv_bytes(data: dict) -> bytes:
+    """
+    Convert the insights dictionary into CSV bytes.
+
+    CSV format:
+      Field,Value
+      url,<url>
+      insights,"<text>"
+      score,<int>
+      strategy,"<text>"
+    """
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(["Field", "Value"])
+    for key, value in data.items():
+        # Ensure complex values are serialized as JSON strings
+        if not isinstance(value, (str, int, float)):
+            serialized = json.dumps(value)
+        else:
+            serialized = value
+        writer.writerow([key, serialized])
+    return buffer.getvalue().encode("utf-8")
+
+
+def generate_pdf_bytes(data: dict) -> bytes:
+    """
+    Render the insights dictionary into a simple PDF report.
+
+    The PDF will include a title followed by each key/value pair.
+    """
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer)
+    styles = getSampleStyleSheet()
+
+    elements = []
+    # Add a title at the top of the PDF
+    elements.append(Paragraph("Business Insights Report", styles["Title"]))
+    elements.append(Spacer(1, 12))
+
+    # Add each field/value pair as a new paragraph
+    for key, value in data.items():
+        text = json.dumps(value, indent=2) if not isinstance(value, str) else value
+        elements.append(Paragraph(f"<b>{key}:</b> {text}", styles["BodyText"]))
+        elements.append(Spacer(1, 12))
+
+    # Build PDF and retrieve byte content
+    doc.build(elements)
+    return buffer.getvalue()
+
+# ----------------------------------------------------------------------------
+# Main Entrypoint
+# ----------------------------------------------------------------------------
+
+def main():
+    """
+    CLI entrypoint:
+      - Prompts for URL and OpenAI key
+      - Runs scraping and GPT analysis
+      - Prompts for CSV/PDF output paths
+      - Writes files
+    """
+    # Prompt for inputs
+    url     = input("Enter URL to scrape: ").strip()
+    if not url:
+        print("No URL entered; exiting.")
+        return
+    api_key = input("Enter OpenAI API key (blank to use env var): ").strip() or None
+
+    # Perform extraction
+    manager = ScrapeManager(url, api_key=api_key)
+    result  = manager.extract()
+
+    # CSV export
+    csv_path = input("CSV output path [report.csv]: ").strip() or "report.csv"
+    with open(csv_path, "wb") as csv_file:
+        csv_file.write(generate_csv_bytes(result))
+    print(f"CSV report saved to {csv_path}")
+
+    # PDF export
+    pdf_path = input("PDF output path [report.pdf]: ").strip() or "report.pdf"
+    with open(pdf_path, "wb") as pdf_file:
+        pdf_file.write(generate_pdf_bytes(result))
+    print(f"PDF report saved to {pdf_path}")
+
+if __name__ == "__main__":
+    main()
