@@ -1,0 +1,7 @@
+# vuln-demo/notes.txt
+# random notes with tokens
+
+Slack Token: xoxb-111111111111-222222222222-ABCDefGhIjKlMnOpQrStUvWxYz
+Stripe Secret Key: sk_test_4eC39HqLyjWDarjtT1zdp7dc
+JWT_TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.DUMMY_PAYLOAD.DUMMY_SIGNATURE"
+DB_PASSWORD=AnotherPass123!
