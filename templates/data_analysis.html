@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Data Analysis & Business Intelligence</title>
+  <!-- Bootstrap CSS -->
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <style>
+    body {
+      background: url("/static/background2.webp") no-repeat center center fixed;
+      background-size: cover;
+      margin: 0;
+      padding: 0;
+      height: 100vh;
+    }
+    .content-container {
+      background-color: rgba(255, 255, 255, 0.9);
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      max-width: 900px;
+      margin: 50px auto;
+    }
+    .navbar {
+      background-color: rgba(0, 0, 0, 0.8);
+    }
+    .navbar a {
+      color: white !important;
+    }
+  </style>
+</head>
+<body>
+
+  <nav class="navbar navbar-expand-lg navbar-dark">
+    <a class="navbar-brand" href="/">Demo Suite</a>
+    <div class="collapse navbar-collapse">
+      <ul class="navbar-nav">
+        <li class="nav-item"><a class="nav-link" href="/estimating">Estimating</a></li>
+        <li class="nav-item"><a class="nav-link" href="/operations">Operations</a></li>
+        <li class="nav-item"><a class="nav-link" href="/crm">CRM</a></li>
+        <li class="nav-item"><a class="nav-link" href="/data-analysis">Data Analysis</a></li>
+        <li class="nav-item"><a class="nav-link" href="/inventory">Inventory</a></li>
+        <li class="nav-item"><a class="nav-link" href="/chatbot">Chatbot</a></li>
+        <li class="nav-item"><a class="nav-link" href="/contract-builder">Contracts</a></li>
+        <li class="nav-item"><a class="nav-link" href="/address-geocoder">Geocoder</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <div class="content-container">
+    <h1>Data Analysis &amp; Business Intelligence</h1>
+    <p>This demo shows profit margins for a few jobs and a simple forecast.</p>
+    <div class="text-center">
+      <img src="/analysis_chart.png" alt="Profit Margins Chart" style="max-width:100%;">
+    </div>
+    <p class="mt-4"><strong>Forecasted Average Margin:</strong> 32.50%</p>
+    <p>This simple forecast is based on averaging the margins of past jobs.</p>
+  </div>
+
+</body>
+</html>

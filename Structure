@@ -1,0 +1,17 @@
+/my-demos
+  ├── app.py               # Main Flask App
+  ├── static/
+  │    ├── background2.webp  # Background Image
+  │    └── style.css        # Common Stylesheet (Optional)
+  ├── templates/
+  │    ├── base.html        # Common Layout Template
+  │    ├── home.html        # Home Page (Landing)
+  │    ├── estimating.html  # Estimating & Quoting
+  │    ├── operations.html  # Operations & Workflow
+  │    ├── crm.html         # CRM & Lead Management
+  │    ├── data_analysis.html # Data Analysis
+  │    ├── inventory.html   # Inventory Management
+  │    ├── chatbot.html     # AI Chatbot
+  │    ├── contract.html    # Contract Builder
+  │    ├── address.html     # Address Geocoder
+  └── app.py                # The Main Flask App

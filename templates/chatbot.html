@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}AI Chatbot Demo{% endblock %}
+
+{% block content %}
+  <div class="container-fluid d-flex align-items-center justify-content-center" style="height: 100vh;">
+    <div class="content-container w-100" style="max-width:600px;">
+      <h1 class="text-center mb-4">AI Chatbot Demo</h1>
+
+      <!-- NEW: API Key input -->
+      <div class="form-group mb-3">
+        <label for="openai_api_key">OpenAI API Key</label>
+        <input type="text"
+               id="openai_api_key"
+               class="form-control"
+               placeholder="Enter your OpenAI API Key"
+               required>
+      </div>
+
+      <!-- Chat window -->
+      <div class="chat-window border rounded p-3 mb-3" id="chat-window" style="height:300px; overflow-y:auto;"></div>
+
+      <!-- Message input -->
+      <div class="input-group">
+        <input type="text"
+               id="user-input"
+               class="form-control"
+               placeholder="Type your message..."
+               aria-label="User input">
+        <button class="btn btn-primary" id="send-btn">Send</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const chatWindow = document.getElementById('chat-window');
+    const userInput = document.getElementById('user-input');
+    const sendBtn   = document.getElementById('send-btn');
+
+    sendBtn.addEventListener('click', sendMessage);
+    userInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
+
+    function sendMessage() {
+      const apiKey = document.getElementById('openai_api_key').value.trim();
+      if (!apiKey) {
+        alert("OpenAI API key is required.");
+        return;
+      }
+      const message = userInput.value.trim();
+      if (!message) return;
+
+      // Display the user's message
+      const userDiv = document.createElement('div');
+      userDiv.classList.add('message-block', 'mb-2');
+      userDiv.innerHTML = `<strong>You:</strong> ${message}`;
+      chatWindow.appendChild(userDiv);
+      chatWindow.scrollTop = chatWindow.scrollHeight;
+
+      userInput.value = '';
+
+      // Send to Flask
+      fetch('/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: message, api_key: apiKey })
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) {
+          alert(data.error);
+          return;
+        }
+        const assistantDiv = document.createElement('div');
+        assistantDiv.classList.add('message-block', 'mb-2');
+        assistantDiv.innerHTML = `<strong>Assistant:</strong><br>${data.assistant}`;
+        chatWindow.appendChild(assistantDiv);
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+      })
+      .catch(err => console.error('Error:', err));
+    }
+  </script>
+{% endblock %}
