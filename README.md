@@ -46,6 +46,7 @@ Most tools work with:
 ```bash
 python -m <module> [command]
 
+## ROLE
 
 Software Developer | Python | CLI Tools | Flask | Security-Focused Engineering
 
